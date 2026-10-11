@@ -137,6 +137,18 @@ struct AuthorizedScanScopeTests {
     }
 }
 
+struct FileNameSearchTests {
+    @Test(arguments: ["ted", "ted lasso", "TED-LASSO", "ted_lasso"])
+    func treatsFilenameSeparatorsLikeSpaces(query: String) {
+        #expect(FileNameSearch.matches("ted.lasso.s03e01.mkv", query: query))
+    }
+
+    @Test
+    func stillRejectsUnrelatedNames() {
+        #expect(!FileNameSearch.matches("ted.lasso.s03e01.mkv", query: "severance"))
+    }
+}
+
 private extension CGRect {
     var area: CGFloat { width * height }
 }

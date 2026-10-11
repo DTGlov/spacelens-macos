@@ -67,7 +67,7 @@ final class AppModel {
 
     var displayedItems: [ScanItem] {
         let filteredItems = items.filter { item in
-            let matchesSearch = searchText.isEmpty || item.name.localizedStandardContains(searchText)
+            let matchesSearch = FileNameSearch.matches(item.name, query: searchText)
             let matchesMinimumSize = item.allocatedSize >= minimumSizeFilter.bytes
             let matchesFilter = switch itemFilter {
             case .all: true
