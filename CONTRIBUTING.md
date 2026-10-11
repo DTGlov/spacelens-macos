@@ -17,10 +17,11 @@ SpaceLens requires macOS 14 or later and Xcode 26 or a compatible Swift 6.2 tool
 git clone https://github.com/DTGlov/spacelens-macos.git
 cd spacelens-macos
 swift test
-swift run SpaceLens
+xcodebuild test -project SpaceLens/SpaceLens.xcodeproj -scheme SpaceLens -destination 'platform=macOS'
+open SpaceLens/SpaceLens.xcodeproj
 ```
 
-The repository currently uses Swift Package Manager and has no third-party dependencies.
+The native application is defined by the Xcode project. A Swift package remains available for fast scanner tests and command-line development. The project has no third-party dependencies.
 
 ## Branches
 
@@ -53,6 +54,7 @@ Run:
 
 ```sh
 swift test
+xcodebuild test -project SpaceLens/SpaceLens.xcodeproj -scheme SpaceLens -destination 'platform=macOS'
 git diff --check
 ```
 

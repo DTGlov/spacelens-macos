@@ -13,12 +13,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "SpaceLens",
-            path: "Sources/SpaceLens"
+            path: "SpaceLens/SpaceLens",
+            exclude: ["Assets.xcassets"]
         ),
         .testTarget(
             name: "SpaceLensTests",
             dependencies: ["SpaceLens"],
-            path: "Tests/SpaceLensTests"
+            path: "SpaceLens/SpaceLensTests"
         )
     ]
 )

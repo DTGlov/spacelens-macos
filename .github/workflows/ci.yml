@@ -30,3 +30,11 @@ jobs:
 
       - name: Build and test
         run: swift test
+
+      - name: Build native macOS app
+        run: >-
+          xcodebuild build
+          -project SpaceLens/SpaceLens.xcodeproj
+          -scheme SpaceLens
+          -destination 'platform=macOS'
+          CODE_SIGNING_ALLOWED=NO
