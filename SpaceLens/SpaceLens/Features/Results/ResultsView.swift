@@ -9,6 +9,8 @@ struct ResultsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 summary
                 Divider()
+                treemap
+                Divider()
                 ResultsTable(model: model)
             }
             .navigationSplitViewColumnWidth(min: 500, ideal: 620)
@@ -16,6 +18,22 @@ struct ResultsView: View {
             InspectorView(item: model.selectedItem, reveal: model.revealSelectedItem)
         }
         .navigationTitle(model.rootURL?.lastPathComponent ?? "Scan Results")
+    }
+
+    private var treemap: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Storage map")
+                    .font(.headline)
+                Spacer()
+                Text("Larger blocks use more space")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            TreemapView(items: model.displayedItems, selection: $model.selection)
+        }
+        .padding(12)
+        .frame(height: 250)
     }
 
     private var summary: some View {
