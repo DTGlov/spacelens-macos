@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible problem in SpaceLens
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve SpaceLens. Remove personal filenames, paths, screenshots, and other private data before submitting.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use a temporary test folder where possible.
+      placeholder: |
+        1. Open SpaceLens
+        2. Choose a test folder
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 14.7
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: SpaceLens commit or version
+      placeholder: Commit SHA or release version
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include sanitized logs or screenshots if they materially help.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed personal paths, filenames, file contents, and credentials from this report.
+          required: true
+        - label: This report does not disclose an unpatched security vulnerability.
+          required: true
