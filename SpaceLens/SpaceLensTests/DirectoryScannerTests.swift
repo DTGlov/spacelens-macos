@@ -138,7 +138,7 @@ struct AuthorizedScanScopeTests {
 }
 
 struct FileNameSearchTests {
-    @Test(arguments: ["ted", "ted lasso", "TED-LASSO", "ted_lasso"])
+    @Test(arguments: ["ted", "ted lasso", "tedlasso", "TED-LASSO", "ted_lasso"])
     func treatsFilenameSeparatorsLikeSpaces(query: String) {
         #expect(FileNameSearch.matches("ted.lasso.s03e01.mkv", query: query))
     }

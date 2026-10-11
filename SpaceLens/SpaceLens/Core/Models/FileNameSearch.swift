@@ -8,7 +8,9 @@ enum FileNameSearch {
         guard !normalizedQuery.isEmpty else {
             return name.localizedStandardContains(query)
         }
-        return normalize(name).contains(normalizedQuery)
+        let normalizedName = normalize(name)
+        return normalizedName.contains(normalizedQuery)
+            || compact(normalizedName).contains(compact(normalizedQuery))
     }
 
     private static func normalize(_ value: String) -> String {
@@ -20,5 +22,9 @@ enum FileNameSearch {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    private static func compact(_ value: String) -> String {
+        value.replacingOccurrences(of: " ", with: "")
     }
 }
