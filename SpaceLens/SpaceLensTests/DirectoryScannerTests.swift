@@ -69,6 +69,40 @@ struct DirectoryScannerTests {
     }
 }
 
+struct TreemapLayoutTests {
+    @Test
+    func createsProportionalNonOverlappingFrames() throws {
+        let bounds = CGRect(x: 0, y: 0, width: 1_000, height: 600)
+        let entries = TreemapLayout().entries(for: [50, 30, 20], in: bounds)
+
+        #expect(entries.count == 3)
+        #expect(entries.allSatisfy { bounds.contains($0.frame) })
+        #expect(entries[0].frame.area / bounds.area == 0.5)
+        #expect(entries[1].frame.area / bounds.area == 0.3)
+        #expect(entries[2].frame.area / bounds.area == 0.2)
+
+        for firstIndex in entries.indices {
+            for secondIndex in entries.indices where firstIndex < secondIndex {
+                #expect(entries[firstIndex].frame.intersection(entries[secondIndex].frame).area == 0)
+            }
+        }
+    }
+
+    @Test
+    func ignoresItemsWithoutAllocatedSize() {
+        let entries = TreemapLayout().entries(
+            for: [100, 0, -1],
+            in: CGRect(x: 0, y: 0, width: 500, height: 300)
+        )
+
+        #expect(entries == [TreemapLayout.Entry(index: 0, frame: CGRect(x: 0, y: 0, width: 500, height: 300))])
+    }
+}
+
+private extension CGRect {
+    var area: CGFloat { width * height }
+}
+
 private final class TemporaryDirectory {
     let url: URL
 

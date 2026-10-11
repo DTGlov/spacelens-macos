@@ -77,7 +77,7 @@ swift run SpaceLens
 ## Roadmap
 
 - [x] Standard sandboxed macOS `.app` target
-- [ ] Interactive storage treemap
+- [x] Interactive storage treemap
 - [ ] Folder navigation, filtering, and search
 - [ ] Quick Look previews
 - [ ] Conservative, explainable safety classifications
