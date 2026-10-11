@@ -16,13 +16,15 @@ final class AppModel {
     private(set) var items: [ScanItem] = []
     private(set) var progress = ScanProgress()
     var selection: ScanItem.ID?
-    var sortOrder = [KeyPathComparator(\ScanItem.allocatedSize, order: .reverse)]
+    @ObservationIgnored
+    var sortOrder: [KeyPathComparator<ScanItem>]
 
     private let scanner: DirectoryScanner
     private var scanTask: Task<Void, Never>?
 
     init(scanner: DirectoryScanner = DirectoryScanner()) {
         self.scanner = scanner
+        sortOrder = [KeyPathComparator(\ScanItem.allocatedSize, order: .reverse)]
     }
 
     var selectedItem: ScanItem? {

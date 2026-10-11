@@ -53,23 +53,30 @@ git clone https://github.com/DTGlov/spacelens-macos.git
 cd spacelens-macos
 ```
 
-Run the prototype:
+Open the native Xcode project:
 
 ```sh
-swift run SpaceLens
+open SpaceLens/SpaceLens.xcodeproj
 ```
 
-Run the test suite:
+Select the `SpaceLens` scheme and the `My Mac` destination, then press Run.
+
+Build and run the complete Xcode test suite from the command line:
+
+```sh
+xcodebuild test -project SpaceLens/SpaceLens.xcodeproj -scheme SpaceLens -destination 'platform=macOS'
+```
+
+The Swift package remains available for quick scanner tests and command-line development:
 
 ```sh
 swift test
+swift run SpaceLens
 ```
-
-You can also open `Package.swift` in Xcode and run the `SpaceLens` scheme.
 
 ## Roadmap
 
-- [ ] Standard signed macOS `.app` target
+- [x] Standard sandboxed macOS `.app` target
 - [ ] Interactive storage treemap
 - [ ] Folder navigation, filtering, and search
 - [ ] Quick Look previews

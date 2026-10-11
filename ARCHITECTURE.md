@@ -4,6 +4,8 @@
 
 Version one is a native macOS application built with Swift and SwiftUI. Filesystem scanning uses Foundation APIs with bounded concurrency. Rust is intentionally deferred until measurement demonstrates a meaningful bottleneck or a reusable cross-platform engine becomes a product requirement.
 
+The distributable application is defined by `SpaceLens/SpaceLens.xcodeproj`. The repository also keeps a Swift package manifest over the same source and unit-test directories for fast command-line validation; it is not a second implementation.
+
 The application uses a feature-oriented structure with a small shared core. It separates filesystem operations from presentation so scanning and safety decisions can be tested without launching the interface.
 
 ## Proposed structure
@@ -120,4 +122,3 @@ The first implementation milestone is intentionally narrow:
 6. Cover aggregation, cancellation, symlink handling, and inaccessible-item behavior with focused tests.
 
 Moving to Trash and the treemap follow only after this slice is reliable. That keeps destructive behavior out of the earliest prototype and gives real scan data for designing the visualization.
-
