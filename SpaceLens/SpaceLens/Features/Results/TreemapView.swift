@@ -3,6 +3,7 @@ import SwiftUI
 struct TreemapView: View {
   let items: [ScanItem]
   @Binding var selection: ScanItem.ID?
+  let open: (ScanItem) -> Void
 
   private let layout = TreemapLayout()
   private let spacing: CGFloat = 2
@@ -24,6 +25,11 @@ struct TreemapView: View {
           ) {
             selection = item.id
           }
+          .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+              open(item)
+            }
+          )
           .frame(
             width: max(entry.frame.width - spacing, 0),
             height: max(entry.frame.height - spacing, 0)

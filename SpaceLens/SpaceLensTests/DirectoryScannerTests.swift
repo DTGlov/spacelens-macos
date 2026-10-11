@@ -99,6 +99,56 @@ struct TreemapLayoutTests {
     }
 }
 
+struct AuthorizedScanScopeTests {
+    @Test
+    func acceptsOnlyRootAndDescendantPaths() {
+        let scope = AuthorizedScanScope(rootURL: URL(fileURLWithPath: "/Users/example/Downloads"))
+
+        #expect(scope.contains(URL(fileURLWithPath: "/Users/example/Downloads")))
+        #expect(scope.contains(URL(fileURLWithPath: "/Users/example/Downloads/Archive/file.zip")))
+        #expect(!scope.contains(URL(fileURLWithPath: "/Users/example/Downloads-old/file.zip")))
+        #expect(!scope.contains(URL(fileURLWithPath: "/Users/example/Documents/file.zip")))
+    }
+
+    @Test
+    func createsBreadcrumbsFromAuthorizedRoot() {
+        let root = URL(fileURLWithPath: "/Users/example/Downloads")
+        let scope = AuthorizedScanScope(rootURL: root)
+
+        let breadcrumbs = scope.breadcrumbs(
+            to: URL(fileURLWithPath: "/Users/example/Downloads/Archive/2025")
+        )
+
+        #expect(breadcrumbs.map(\.lastPathComponent) == ["Downloads", "Archive", "2025"])
+    }
+
+    @Test
+    func rejectsDescendantSymlinkThatEscapesRoot() throws {
+        let authorizedDirectory = try TemporaryDirectory()
+        let outsideDirectory = try TemporaryDirectory()
+        let outsideFile = outsideDirectory.url.appending(path: "private.bin")
+        try Data([0]).write(to: outsideFile)
+        let link = authorizedDirectory.url.appending(path: "escape")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outsideDirectory.url)
+
+        let scope = AuthorizedScanScope(rootURL: authorizedDirectory.url)
+
+        #expect(!scope.contains(link.appending(path: "private.bin")))
+    }
+}
+
+struct FileNameSearchTests {
+    @Test(arguments: ["ted", "ted lasso", "tedlasso", "TED-LASSO", "ted_lasso"])
+    func treatsFilenameSeparatorsLikeSpaces(query: String) {
+        #expect(FileNameSearch.matches("ted.lasso.s03e01.mkv", query: query))
+    }
+
+    @Test
+    func stillRejectsUnrelatedNames() {
+        #expect(!FileNameSearch.matches("ted.lasso.s03e01.mkv", query: "severance"))
+    }
+}
+
 private extension CGRect {
     var area: CGFloat { width * height }
 }

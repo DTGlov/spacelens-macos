@@ -7,6 +7,8 @@ struct ResultsView: View {
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 0) {
+                navigationBar
+                Divider()
                 summary
                 Divider()
                 treemap
@@ -18,6 +20,58 @@ struct ResultsView: View {
             InspectorView(item: model.selectedItem, reveal: model.revealSelectedItem)
         }
         .navigationTitle(model.rootURL?.lastPathComponent ?? "Scan Results")
+        .searchable(text: $model.searchText, prompt: "Search this folder")
+    }
+
+    private var navigationBar: some View {
+        HStack(spacing: 8) {
+            Button("Back", systemImage: "chevron.backward", action: model.goBack)
+                .labelStyle(.iconOnly)
+                .disabled(!model.canGoBack)
+                .keyboardShortcut("[", modifiers: .command)
+                .help("Back")
+            Button("Up", systemImage: "arrow.up", action: model.goUp)
+                .labelStyle(.iconOnly)
+                .disabled(!model.canGoUp)
+                .keyboardShortcut(.upArrow, modifiers: .command)
+                .help("Go to enclosing folder")
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(model.breadcrumbs, id: \.self) { url in
+                        if url != model.breadcrumbs.first {
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                        Button(url.lastPathComponent) {
+                            model.navigate(to: url)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(url == model.rootURL)
+                    }
+                }
+            }
+
+            Spacer(minLength: 8)
+            Picker("Show", selection: $model.itemFilter) {
+                ForEach(AppModel.ItemFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 110)
+            Picker("Minimum size", selection: $model.minimumSizeFilter) {
+                ForEach(AppModel.MinimumSizeFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 105)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var treemap: some View {
@@ -30,7 +84,11 @@ struct ResultsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            TreemapView(items: model.displayedItems, selection: $model.selection)
+            TreemapView(
+                items: model.displayedItems,
+                selection: $model.selection,
+                open: model.openFolder
+            )
         }
         .padding(12)
         .frame(height: 250)
@@ -74,6 +132,7 @@ private struct ResultsTable: View {
             }
             .width(min: 105, ideal: 125)
         }
+        .onTapGesture(count: 2, perform: model.openSelectedFolder)
     }
 }
 
