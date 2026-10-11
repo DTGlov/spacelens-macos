@@ -15,9 +15,10 @@ struct ResultsView: View {
                 Divider()
                 ResultsTable(model: model)
             }
-            .navigationSplitViewColumnWidth(min: 500, ideal: 620)
+            .navigationSplitViewColumnWidth(min: 460, ideal: 620, max: 720)
         } detail: {
             InspectorView(item: model.selectedItem, reveal: model.revealSelectedItem)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 420)
         }
         .navigationTitle(model.rootURL?.lastPathComponent ?? "Scan Results")
         .searchable(text: $model.searchText, prompt: "Search this folder")
@@ -53,8 +54,9 @@ struct ResultsView: View {
                     }
                 }
             }
+            .frame(minWidth: 80, maxWidth: .infinity)
+            .layoutPriority(1)
 
-            Spacer(minLength: 8)
             Picker("Show", selection: $model.itemFilter) {
                 ForEach(AppModel.ItemFilter.allCases) { filter in
                     Text(filter.rawValue).tag(filter)

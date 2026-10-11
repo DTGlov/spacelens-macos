@@ -9,6 +9,7 @@ struct SpaceLensApp: App {
             ContentView(model: model)
                 .frame(minWidth: 880, minHeight: 560)
         }
+        .defaultSize(width: 1_100, height: 720)
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
