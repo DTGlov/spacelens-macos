@@ -51,22 +51,6 @@ private extension TrashRequest {
     }
 }
 
-private struct WelcomeView: View {
-    let chooseFolder: () -> Void
-
-    var body: some View {
-        ContentUnavailableView {
-            Label("See what is using your storage", systemImage: "internaldrive")
-        } description: {
-            Text("Choose a folder to find its largest files and folders. SpaceLens won’t modify anything.")
-        } actions: {
-            Button("Choose a Folder…", action: chooseFolder)
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-        }
-    }
-}
-
 private struct ErrorView: View {
     let message: String
     let chooseFolder: () -> Void
