@@ -58,8 +58,9 @@ struct ScanView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                ProgressView()
+                ProgressView("Scanning folder")
                     .controlSize(.small)
+                    .labelsHidden()
                 Text(model.progress.currentPath.isEmpty ? "Preparing scan…" : model.progress.currentPath)
                     .font(.caption)
                     .foregroundStyle(.tertiary)

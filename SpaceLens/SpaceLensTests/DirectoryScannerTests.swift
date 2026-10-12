@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import SpaceLens
@@ -60,6 +61,37 @@ struct DirectoryScannerTests {
     }
 
     private func completedResult(from scanner: DirectoryScanner, url: URL) async throws -> ScanResult {
+        for try await event in scanner.scan(url: url) {
+            if case .finished(let result) = event {
+                return result
+            }
+        }
+        throw CocoaError(.fileReadUnknown)
+    }
+}
+
+struct DirectoryScannerPerformanceTests {
+    @Test
+    func scansARepresentativeLargeFixtureWithinTheRegressionBudget() async throws {
+        let fixture = try TemporaryDirectory()
+        for folderIndex in 0..<25 {
+            let folder = fixture.url.appending(path: "Folder-\(folderIndex)", directoryHint: .isDirectory)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for fileIndex in 0..<100 {
+                try Data([0]).write(to: folder.appending(path: "File-\(fileIndex).bin"))
+            }
+        }
+
+        let clock = ContinuousClock()
+        let start = clock.now
+        let result = try await completedScan(from: DirectoryScanner(), url: fixture.url)
+        let elapsed = start.duration(to: clock.now)
+
+        #expect(result.progress.scannedItemCount == 2_525)
+        #expect(elapsed < .seconds(5), "A 2,500-file scan took \(elapsed)")
+    }
+
+    private func completedScan(from scanner: DirectoryScanner, url: URL) async throws -> ScanResult {
         for try await event in scanner.scan(url: url) {
             if case .finished(let result) = event {
                 return result
