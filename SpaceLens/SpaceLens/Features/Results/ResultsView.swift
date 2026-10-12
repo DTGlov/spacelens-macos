@@ -1,4 +1,5 @@
 import AppKit
+import QuickLook
 import SwiftUI
 
 struct ResultsView: View {
@@ -22,7 +23,12 @@ struct ResultsView: View {
                 alignment: .topLeading
             )
 
-            InspectorView(item: model.selectedItem, reveal: model.revealSelectedItem)
+            InspectorView(
+                item: model.selectedItem,
+                canPreview: model.previewableSelectedItem != nil,
+                preview: model.previewSelectedItem,
+                reveal: model.revealSelectedItem
+            )
                 .frame(
                     minWidth: 280,
                     idealWidth: 340,
@@ -34,6 +40,7 @@ struct ResultsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(model.rootURL?.lastPathComponent ?? "Scan Results")
         .searchable(text: $model.searchText, prompt: "Search this folder")
+        .quickLookPreview($model.previewURL)
     }
 
     private var navigationBar: some View {
@@ -165,6 +172,8 @@ private struct ModificationDateText: View {
 
 private struct InspectorView: View {
     let item: ScanItem?
+    let canPreview: Bool
+    let preview: () -> Void
     let reveal: () -> Void
 
     var body: some View {
@@ -203,6 +212,9 @@ private struct InspectorView: View {
                 }
 
                 Section {
+                    Button("Quick Look", systemImage: "eye", action: preview)
+                        .disabled(!canPreview)
+                        .keyboardShortcut(.space, modifiers: [])
                     Button("Reveal in Finder", action: reveal)
                         .keyboardShortcut(.return, modifiers: [.command])
                 }

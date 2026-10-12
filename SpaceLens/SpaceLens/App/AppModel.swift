@@ -42,7 +42,14 @@ final class AppModel {
     private(set) var authorizedScope: AuthorizedScanScope?
     private(set) var items: [ScanItem] = []
     private(set) var progress = ScanProgress()
-    var selection: ScanItem.ID?
+    var selection: ScanItem.ID? {
+        didSet {
+            if previewURL != nil {
+                previewURL = previewableSelectedItem?.url
+            }
+        }
+    }
+    var previewURL: URL?
     var searchText = ""
     var itemFilter: ItemFilter = .all
     var minimumSizeFilter: MinimumSizeFilter = .any
@@ -63,6 +70,11 @@ final class AppModel {
     var selectedItem: ScanItem? {
         guard let selection else { return nil }
         return items.first { $0.id == selection }
+    }
+
+    var previewableSelectedItem: ScanItem? {
+        guard let selectedItem, FilePreview.isAvailable(for: selectedItem) else { return nil }
+        return selectedItem
     }
 
     var displayedItems: [ScanItem] {
@@ -200,5 +212,9 @@ final class AppModel {
     func revealSelectedItem() {
         guard let selectedItem else { return }
         NSWorkspace.shared.activateFileViewerSelecting([selectedItem.url])
+    }
+
+    func previewSelectedItem() {
+        previewURL = previewableSelectedItem?.url
     }
 }
