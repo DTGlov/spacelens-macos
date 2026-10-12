@@ -79,7 +79,7 @@ swift run SpaceLens
 - [x] Standard sandboxed macOS `.app` target
 - [x] Interactive storage treemap
 - [x] Folder navigation, filtering, and search
-- [ ] Quick Look previews
+- [x] Quick Look previews
 - [ ] Conservative, explainable safety classifications
 - [ ] Confirmed Move to Trash workflow
 - [ ] Accessibility and performance refinement

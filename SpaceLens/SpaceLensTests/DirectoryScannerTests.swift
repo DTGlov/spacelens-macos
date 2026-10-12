@@ -149,6 +149,32 @@ struct FileNameSearchTests {
     }
 }
 
+struct FilePreviewTests {
+    @Test
+    func allowsExistingFilesButNotFoldersOrMissingFiles() throws {
+        let fixture = try TemporaryDirectory()
+        let fileURL = fixture.url.appending(path: "preview.pdf")
+        try Data([0]).write(to: fileURL)
+
+        #expect(FilePreview.isAvailable(for: scanItem(at: fileURL, kind: .file)))
+        #expect(!FilePreview.isAvailable(for: scanItem(at: fixture.url, kind: .folder)))
+        #expect(!FilePreview.isAvailable(for: scanItem(at: fixture.url.appending(path: "missing.pdf"), kind: .file)))
+    }
+
+    private func scanItem(at url: URL, kind: ScanItem.Kind) -> ScanItem {
+        ScanItem(
+            id: url,
+            url: url,
+            name: url.lastPathComponent,
+            kind: kind,
+            logicalSize: 0,
+            allocatedSize: 0,
+            modificationDate: nil,
+            skippedItemCount: 0
+        )
+    }
+}
+
 private extension CGRect {
     var area: CGFloat { width * height }
 }
