@@ -82,7 +82,7 @@ swift run SpaceLens
 - [x] Quick Look previews
 - [x] Conservative, explainable safety classifications
 - [x] Confirmed Move to Trash workflow
-- [ ] Accessibility and performance refinement
+- [x] Accessibility and performance refinement
 - [ ] Signed release builds
 
 The roadmap is directional rather than a promise of specific release dates. Proposed changes should preserve SpaceLens's conservative safety model.

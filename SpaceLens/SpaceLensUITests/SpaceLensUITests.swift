@@ -17,11 +17,11 @@ final class SpaceLensUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["See what is using your storage"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Choose a Folder…"].exists)
+        XCTAssertTrue(app.staticTexts["See where your storage went."].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Choose a folder to scan"].exists)
         XCTAssertTrue(
             app.staticTexts[
-                "Choose a folder to find its largest files and folders. SpaceLens won’t modify anything."
+                "Scans stay on your Mac. Nothing moves unless you confirm it."
             ].exists
         )
     }

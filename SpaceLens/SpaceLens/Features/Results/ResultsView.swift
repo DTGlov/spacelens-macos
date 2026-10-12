@@ -6,22 +6,28 @@ struct ResultsView: View {
     @Bindable var model: AppModel
 
     var body: some View {
+        let displayedItems = model.displayedItems
         HSplitView {
             VStack(alignment: .leading, spacing: 0) {
                 navigationBar
                 Divider()
-                summary
+                summary(displayedItemCount: displayedItems.count)
                 Divider()
-                if model.displayedItems.isEmpty {
+                if displayedItems.isEmpty {
                     EmptyResultsView(
                         searchText: model.searchText,
                         hasActiveFilters: model.hasActiveFilters,
                         clearFilters: model.clearFilters
                     )
                 } else {
-                    treemap
+                    treemap(items: displayedItems)
                     Divider()
-                    ResultsTable(model: model)
+                    ResultsTable(
+                        items: displayedItems,
+                        selection: $model.selection,
+                        sortOrder: $model.sortOrder,
+                        openSelectedFolder: model.openSelectedFolder
+                    )
                 }
             }
             .frame(
@@ -33,8 +39,10 @@ struct ResultsView: View {
 
             InspectorView(
                 item: model.selectedItem,
+                canOpenFolder: model.selectedItem?.isFolder == true,
                 canPreview: model.previewableSelectedItem != nil,
                 canMoveToTrash: model.canMoveSelectedItemToTrash,
+                openFolder: model.openSelectedFolder,
                 preview: model.previewSelectedItem,
                 reveal: model.revealSelectedItem,
                 requestMoveToTrash: model.requestMoveSelectedItemToTrash
@@ -105,7 +113,7 @@ struct ResultsView: View {
         .padding(.vertical, 8)
     }
 
-    private var treemap: some View {
+    private func treemap(items: [ScanItem]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Storage map")
@@ -116,7 +124,7 @@ struct ResultsView: View {
                     .foregroundStyle(.secondary)
             }
             TreemapView(
-                items: model.displayedItems,
+                items: items,
                 selection: $model.selection,
                 open: model.openFolder
             )
@@ -127,7 +135,7 @@ struct ResultsView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
-    private var summary: some View {
+    private func summary(displayedItemCount: Int) -> some View {
         HStack(spacing: 20) {
             Label(model.progress.discoveredSize.formatted(.byteCount(style: .file)), systemImage: "internaldrive")
             Label("\(model.progress.scannedItemCount.formatted()) items", systemImage: "doc.on.doc")
@@ -137,7 +145,7 @@ struct ResultsView: View {
                     .help("Some items could not be read or were outside the selected filesystem.")
             }
             Spacer()
-            Text("Showing \(model.displayedItems.count.formatted()) of \(model.items.count.formatted())")
+            Text("Showing \(displayedItemCount.formatted()) of \(model.items.count.formatted())")
                 .foregroundStyle(.secondary)
         }
         .font(.callout)
@@ -147,10 +155,13 @@ struct ResultsView: View {
 }
 
 private struct ResultsTable: View {
-    @Bindable var model: AppModel
+    let items: [ScanItem]
+    @Binding var selection: ScanItem.ID?
+    @Binding var sortOrder: [KeyPathComparator<ScanItem>]
+    let openSelectedFolder: () -> Void
 
     var body: some View {
-        Table(model.displayedItems, selection: $model.selection, sortOrder: $model.sortOrder) {
+        Table(items, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { item in
                 let classification = ItemClassification.classify(item)
                 Label {
@@ -177,7 +188,7 @@ private struct ResultsTable: View {
             }
             .width(min: 105, ideal: 125)
         }
-        .onTapGesture(count: 2, perform: model.openSelectedFolder)
+        .onTapGesture(count: 2, perform: openSelectedFolder)
     }
 }
 
@@ -224,8 +235,10 @@ private struct ModificationDateText: View {
 
 private struct InspectorView: View {
     let item: ScanItem?
+    let canOpenFolder: Bool
     let canPreview: Bool
     let canMoveToTrash: Bool
+    let openFolder: () -> Void
     let preview: () -> Void
     let reveal: () -> Void
     let requestMoveToTrash: () -> Void
@@ -282,6 +295,9 @@ private struct InspectorView: View {
                 }
 
                 Section("Actions") {
+                    Button("Open Folder", systemImage: "folder", action: openFolder)
+                        .disabled(!canOpenFolder)
+                        .keyboardShortcut(.downArrow, modifiers: [.command])
                     Button("Quick Look", systemImage: "eye", action: preview)
                         .disabled(!canPreview)
                         .keyboardShortcut(.space, modifiers: [])
