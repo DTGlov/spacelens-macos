@@ -80,7 +80,7 @@ swift run SpaceLens
 - [x] Interactive storage treemap
 - [x] Folder navigation, filtering, and search
 - [x] Quick Look previews
-- [ ] Conservative, explainable safety classifications
+- [x] Conservative, explainable safety classifications
 - [ ] Confirmed Move to Trash workflow
 - [ ] Accessibility and performance refinement
 - [ ] Signed release builds
