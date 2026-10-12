@@ -7,7 +7,12 @@ struct SpaceLensApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
-                .frame(minWidth: 880, minHeight: 560)
+                .frame(
+                    minWidth: 880,
+                    maxWidth: .infinity,
+                    minHeight: 560,
+                    maxHeight: .infinity
+                )
         }
         .defaultSize(width: 1_100, height: 720)
         .windowStyle(.titleBar)
