@@ -12,6 +12,7 @@ struct ResultsView: View {
                 navigationBar
                 Divider()
                 summary(displayedItemCount: displayedItems.count)
+                insights
                 Divider()
                 if displayedItems.isEmpty {
                     EmptyResultsView(
@@ -151,6 +152,79 @@ struct ResultsView: View {
         .font(.callout)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+    }
+
+    private var insights: some View {
+        HStack(spacing: 10) {
+            Text("Insights")
+                .font(.headline)
+            ForEach([AppModel.InsightFilter.largeFiles, .notModifiedInYear]) { insight in
+                let summary = model.insightSummary(for: insight)
+                InsightButton(
+                    insight: insight,
+                    summary: summary,
+                    isSelected: model.insightFilter == insight
+                ) {
+                    model.insightFilter = model.insightFilter == insight ? .all : insight
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+private struct InsightButton: View {
+    let insight: AppModel.InsightFilter
+    let summary: AppModel.InsightSummary
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: insight.systemImage)
+                    .font(.title3)
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(insight.title)
+                        .font(.callout.weight(.semibold))
+                    Text(
+                        "\(summary.itemCount.formatted()) files · \(summary.allocatedSize.formatted(.byteCount(style: .file)))"
+                    )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(minWidth: 190, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? Color.accentColor.opacity(0.12)
+                            : Color(nsColor: .controlBackgroundColor)
+                    )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(
+                        isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            "\(insight.title), \(summary.itemCount) files, \(summary.allocatedSize.formatted(.byteCount(style: .file)))"
+        )
+        .accessibilityHint(isSelected ? "Shows all items" : "Filters the storage map and file list")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

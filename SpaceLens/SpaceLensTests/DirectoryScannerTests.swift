@@ -181,6 +181,81 @@ struct FileNameSearchTests {
     }
 }
 
+struct StorageInsightTests {
+    private let referenceDate = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test
+    func largeFilesIncludesOnlyFilesAtLeastOneGigabyte() {
+        #expect(
+            AppModel.InsightFilter.largeFiles.matches(
+                item(size: 1_000_000_000),
+                referenceDate: referenceDate
+            )
+        )
+        #expect(
+            !AppModel.InsightFilter.largeFiles.matches(
+                item(size: 999_999_999),
+                referenceDate: referenceDate
+            )
+        )
+        #expect(
+            !AppModel.InsightFilter.largeFiles.matches(
+                item(size: 2_000_000_000, kind: .folder),
+                referenceDate: referenceDate
+            )
+        )
+    }
+
+    @Test
+    func notModifiedInYearUsesAOneYearCutoffAndExcludesFolders() throws {
+        let cutoff = try #require(
+            Calendar.current.date(byAdding: .year, value: -1, to: referenceDate)
+        )
+        #expect(
+            AppModel.InsightFilter.notModifiedInYear.matches(
+                item(modificationDate: cutoff),
+                referenceDate: referenceDate
+            )
+        )
+        #expect(
+            !AppModel.InsightFilter.notModifiedInYear.matches(
+                item(modificationDate: referenceDate),
+                referenceDate: referenceDate
+            )
+        )
+        #expect(
+            !AppModel.InsightFilter.notModifiedInYear.matches(
+                item(kind: .folder, modificationDate: cutoff),
+                referenceDate: referenceDate
+            )
+        )
+        #expect(
+            !AppModel.InsightFilter.notModifiedInYear.matches(
+                item(modificationDate: nil),
+                referenceDate: referenceDate
+            )
+        )
+    }
+
+    private func item(
+        size: Int64 = 1,
+        kind: ScanItem.Kind = .file,
+        modificationDate: Date? = .distantPast
+    ) -> ScanItem {
+        let url = URL(fileURLWithPath: "/tmp/example")
+        return ScanItem(
+            id: url,
+            url: url,
+            name: "example",
+            kind: kind,
+            logicalSize: size,
+            allocatedSize: size,
+            modificationDate: modificationDate,
+            skippedItemCount: 0
+        )
+    }
+}
+
 struct FilePreviewTests {
     @Test
     func allowsExistingFilesButNotFoldersOrMissingFiles() throws {
