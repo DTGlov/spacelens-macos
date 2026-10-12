@@ -5,7 +5,7 @@ struct ResultsView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        NavigationSplitView {
+        HSplitView {
             VStack(alignment: .leading, spacing: 0) {
                 navigationBar
                 Divider()
@@ -15,10 +15,23 @@ struct ResultsView: View {
                 Divider()
                 ResultsTable(model: model)
             }
-            .navigationSplitViewColumnWidth(min: 500, ideal: 620)
-        } detail: {
+            .frame(
+                minWidth: 540,
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+
             InspectorView(item: model.selectedItem, reveal: model.revealSelectedItem)
+                .frame(
+                    minWidth: 280,
+                    idealWidth: 340,
+                    maxWidth: 440,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(model.rootURL?.lastPathComponent ?? "Scan Results")
         .searchable(text: $model.searchText, prompt: "Search this folder")
     }
@@ -53,8 +66,9 @@ struct ResultsView: View {
                     }
                 }
             }
+            .frame(minWidth: 80, maxWidth: .infinity)
+            .layoutPriority(1)
 
-            Spacer(minLength: 8)
             Picker("Show", selection: $model.itemFilter) {
                 ForEach(AppModel.ItemFilter.allCases) { filter in
                     Text(filter.rawValue).tag(filter)
