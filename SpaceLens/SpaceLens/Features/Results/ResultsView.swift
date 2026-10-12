@@ -26,8 +26,10 @@ struct ResultsView: View {
             InspectorView(
                 item: model.selectedItem,
                 canPreview: model.previewableSelectedItem != nil,
+                canMoveToTrash: model.canMoveSelectedItemToTrash,
                 preview: model.previewSelectedItem,
-                reveal: model.revealSelectedItem
+                reveal: model.revealSelectedItem,
+                requestMoveToTrash: model.requestMoveSelectedItemToTrash
             )
                 .frame(
                     minWidth: 280,
@@ -173,8 +175,10 @@ private struct ModificationDateText: View {
 private struct InspectorView: View {
     let item: ScanItem?
     let canPreview: Bool
+    let canMoveToTrash: Bool
     let preview: () -> Void
     let reveal: () -> Void
+    let requestMoveToTrash: () -> Void
 
     var body: some View {
         if let item {
@@ -232,6 +236,11 @@ private struct InspectorView: View {
                         .keyboardShortcut(.space, modifiers: [])
                     Button("Reveal in Finder", action: reveal)
                         .keyboardShortcut(.return, modifiers: [.command])
+                    Button(role: .destructive, action: requestMoveToTrash) {
+                        Label("Move to Trash", systemImage: "trash")
+                    }
+                    .disabled(!canMoveToTrash)
+                    .keyboardShortcut(.delete, modifiers: [.command])
                 }
             }
             .formStyle(.grouped)

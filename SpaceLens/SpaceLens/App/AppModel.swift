@@ -4,6 +4,16 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    struct TrashAlert: Identifiable {
+        enum Kind {
+            case confirmation(TrashRequest)
+            case message(title: String, message: String)
+        }
+
+        let id = UUID()
+        let kind: Kind
+    }
+
     enum ItemFilter: String, CaseIterable, Identifiable {
         case all = "All items"
         case folders = "Folders"
@@ -50,6 +60,7 @@ final class AppModel {
         }
     }
     var previewURL: URL?
+    var trashAlert: TrashAlert?
     var searchText = ""
     var itemFilter: ItemFilter = .all
     var minimumSizeFilter: MinimumSizeFilter = .any
@@ -57,13 +68,18 @@ final class AppModel {
     var sortOrder: [KeyPathComparator<ScanItem>]
 
     private let scanner: DirectoryScanner
+    private let trashService: TrashService
     private var scanTask: Task<Void, Never>?
     private var scanID = UUID()
     private var backStack: [URL] = []
     private var cachedResults: [URL: ScanResult] = [:]
 
-    init(scanner: DirectoryScanner = DirectoryScanner()) {
+    init(
+        scanner: DirectoryScanner = DirectoryScanner(),
+        trashService: TrashService = TrashService()
+    ) {
         self.scanner = scanner
+        self.trashService = trashService
         sortOrder = [KeyPathComparator(\ScanItem.allocatedSize, order: .reverse)]
     }
 
@@ -75,6 +91,12 @@ final class AppModel {
     var previewableSelectedItem: ScanItem? {
         guard let selectedItem, FilePreview.isAvailable(for: selectedItem) else { return nil }
         return selectedItem
+    }
+
+    var canMoveSelectedItemToTrash: Bool {
+        guard let selectedItem, selectedItem.skippedItemCount == 0 else { return false }
+        let classification = ItemClassification.classify(selectedItem)
+        return SafetyAssessment.assess(selectedItem, classification: classification).level != .protectedOrUnknown
     }
 
     var displayedItems: [ScanItem] {
@@ -216,5 +238,51 @@ final class AppModel {
 
     func previewSelectedItem() {
         previewURL = previewableSelectedItem?.url
+    }
+
+    func requestMoveSelectedItemToTrash() {
+        guard let selectedItem, let authorizedScope else { return }
+        Task { [weak self, trashService] in
+            do {
+                let request = try await trashService.prepare(
+                    item: selectedItem,
+                    authorizedScope: authorizedScope
+                )
+                self?.trashAlert = TrashAlert(kind: .confirmation(request))
+            } catch {
+                self?.presentTrashError(error)
+            }
+        }
+    }
+
+    func confirmMoveToTrash(_ request: TrashRequest) {
+        Task { [weak self, trashService] in
+            do {
+                let result = try await trashService.moveToTrash(request)
+                guard let self else { return }
+                let folderToReload = rootURL
+                cachedResults = [:]
+                if let folderToReload {
+                    loadFolder(at: folderToReload)
+                }
+                trashAlert = TrashAlert(
+                    kind: .message(
+                        title: "Moved to Trash",
+                        message: "“\(result.item.name)” was moved to Trash. Its space becomes available after you empty Trash."
+                    )
+                )
+            } catch {
+                self?.presentTrashError(error)
+            }
+        }
+    }
+
+    private func presentTrashError(_ error: Error) {
+        trashAlert = TrashAlert(
+            kind: .message(
+                title: "Couldn’t Move to Trash",
+                message: error.localizedDescription
+            )
+        )
     }
 }

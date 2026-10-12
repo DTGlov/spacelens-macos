@@ -81,7 +81,7 @@ swift run SpaceLens
 - [x] Folder navigation, filtering, and search
 - [x] Quick Look previews
 - [x] Conservative, explainable safety classifications
-- [ ] Confirmed Move to Trash workflow
+- [x] Confirmed Move to Trash workflow
 - [ ] Accessibility and performance refinement
 - [ ] Signed release builds
 
