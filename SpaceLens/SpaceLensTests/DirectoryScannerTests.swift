@@ -223,13 +223,128 @@ struct SafetyAssessmentTests {
     #expect(assessment(for: "/Volumes/External/mystery.bin").level == .protectedOrUnknown)
   }
 
+  @Test
+  func protectsFoldersWithUninspectedContents() {
+    let item = scanItem(
+      path: "/Users/example/Documents/Incomplete",
+      kind: .folder,
+      skippedItemCount: 1
+    )
+
+    #expect(
+      SafetyAssessment.assess(item, classification: ItemClassification.classify(item)).level
+        == .protectedOrUnknown)
+  }
+
   private func assessment(for path: String, kind: ScanItem.Kind = .file) -> SafetyAssessment {
     let item = scanItem(path: path, kind: kind)
     return SafetyAssessment.assess(item, classification: ItemClassification.classify(item))
   }
 }
 
-private func scanItem(path: String, kind: ScanItem.Kind = .file) -> ScanItem {
+struct TrashServiceTests {
+  @Test
+  func movesARevalidatedItemUsingTheInjectedTrashOperation() async throws {
+    let fixture = try TemporaryDirectory()
+    let cacheFolder = fixture.url.appending(path: "Library/Caches", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: cacheFolder, withIntermediateDirectories: true)
+    let fileURL = cacheFolder.appending(path: "rebuildable.bin")
+    let destinationURL = fixture.url.appending(path: "trashed.bin")
+    try Data([0]).write(to: fileURL)
+    let service = TrashService { url in
+      try FileManager.default.moveItem(at: url, to: destinationURL)
+    }
+
+    let request = try await service.prepare(
+      item: scanItem(path: fileURL.path),
+      authorizedScope: AuthorizedScanScope(rootURL: fixture.url)
+    )
+    let result = try await service.moveToTrash(request)
+
+    #expect(result.item.url == fileURL)
+    #expect(!FileManager.default.fileExists(atPath: fileURL.path))
+    #expect(FileManager.default.fileExists(atPath: destinationURL.path))
+  }
+
+  @Test
+  func rejectsItemsOutsideTheAuthorizedScope() async throws {
+    let authorized = try TemporaryDirectory()
+    let outside = try TemporaryDirectory()
+    let fileURL = outside.url.appending(path: "Library/Caches/file.bin")
+    try FileManager.default.createDirectory(
+      at: fileURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data([0]).write(to: fileURL)
+    let service = TrashService { _ in }
+
+    do {
+      _ = try await service.prepare(
+        item: scanItem(path: fileURL.path),
+        authorizedScope: AuthorizedScanScope(rootURL: authorized.url)
+      )
+      Issue.record("Expected the out-of-scope item to be rejected")
+    } catch let error as TrashServiceError {
+      #expect(error == .outsideAuthorizedScope)
+    }
+  }
+
+  @Test
+  func rejectsProtectedItemsEvenWhenTheServiceIsCalledDirectly() async throws {
+    let fixture = try TemporaryDirectory()
+    let fileURL = fixture.url.appending(path: "unknown.bin")
+    try Data([0]).write(to: fileURL)
+    let service = TrashService { _ in
+      Issue.record("The Trash operation must not run for a protected item")
+    }
+
+    do {
+      _ = try await service.prepare(
+        item: scanItem(path: fileURL.path),
+        authorizedScope: AuthorizedScanScope(rootURL: fixture.url)
+      )
+      Issue.record("Expected the protected item to be rejected")
+    } catch let error as TrashServiceError {
+      #expect(error == .protectedItem)
+    }
+  }
+
+  @Test
+  func rejectsAnItemWhoseIdentityChangedAfterConfirmation() async throws {
+    let fixture = try TemporaryDirectory()
+    let cacheFolder = fixture.url.appending(path: "Library/Caches", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: cacheFolder, withIntermediateDirectories: true)
+    let fileURL = cacheFolder.appending(path: "changing.bin")
+    try Data([0]).write(to: fileURL)
+    let service = TrashService { _ in }
+    let request = try await service.prepare(
+      item: scanItem(path: fileURL.path),
+      authorizedScope: AuthorizedScanScope(rootURL: fixture.url)
+    )
+    let changedRequest = TrashRequest(
+      item: request.item,
+      authorizedScope: request.authorizedScope,
+      expectedIdentity: FileIdentity(
+        volumeNumber: request.expectedIdentity.volumeNumber,
+        fileNumber: request.expectedIdentity.fileNumber &+ 1
+      ),
+      assessment: request.assessment
+    )
+
+    do {
+      _ = try await service.moveToTrash(changedRequest)
+      Issue.record("Expected the changed item to be rejected")
+    } catch let error as TrashServiceError {
+      #expect(error == .itemChanged)
+    }
+  }
+}
+
+private func scanItem(
+  path: String,
+  kind: ScanItem.Kind = .file,
+  skippedItemCount: Int = 0
+) -> ScanItem {
   let url = URL(fileURLWithPath: path)
   return ScanItem(
     id: url,
@@ -239,7 +354,7 @@ private func scanItem(path: String, kind: ScanItem.Kind = .file) -> ScanItem {
     logicalSize: 0,
     allocatedSize: 0,
     modificationDate: nil,
-    skippedItemCount: 0
+    skippedItemCount: skippedItemCount
   )
 }
 

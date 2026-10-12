@@ -15,6 +15,11 @@ struct SafetyAssessment: Equatable, Sendable {
     let isUserLocation = components.starts(with: ["/", "Users"])
     let isApplicationsLocation = components.count > 1 && components[1] == "Applications"
 
+    if item.skippedItemCount > 0 {
+      return protected(
+        "SpaceLens couldn’t inspect every item inside this folder, so its contents are not fully known."
+      )
+    }
     if item.kind == .symbolicLink {
       return protected(
         "This is a symbolic link. SpaceLens cannot verify what removing it could affect.")
