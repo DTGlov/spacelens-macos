@@ -12,9 +12,17 @@ struct ResultsView: View {
                 Divider()
                 summary
                 Divider()
-                treemap
-                Divider()
-                ResultsTable(model: model)
+                if model.displayedItems.isEmpty {
+                    EmptyResultsView(
+                        searchText: model.searchText,
+                        hasActiveFilters: model.hasActiveFilters,
+                        clearFilters: model.clearFilters
+                    )
+                } else {
+                    treemap
+                    Divider()
+                    ResultsTable(model: model)
+                }
             }
             .frame(
                 minWidth: 540,
@@ -112,9 +120,11 @@ struct ResultsView: View {
                 selection: $model.selection,
                 open: model.openFolder
             )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .padding(12)
-        .frame(height: 250)
+        .padding(14)
+        .frame(height: 270)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var summary: some View {
@@ -127,7 +137,7 @@ struct ResultsView: View {
                     .help("Some items could not be read or were outside the selected filesystem.")
             }
             Spacer()
-            Text("Largest 100 items")
+            Text("Showing \(model.displayedItems.count.formatted()) of \(model.items.count.formatted())")
                 .foregroundStyle(.secondary)
         }
         .font(.callout)
@@ -142,9 +152,21 @@ private struct ResultsTable: View {
     var body: some View {
         Table(model.displayedItems, selection: $model.selection, sortOrder: $model.sortOrder) {
             TableColumn("Name", value: \.name) { item in
-                Label(item.name, systemImage: item.isFolder ? "folder.fill" : "doc.fill")
+                let classification = ItemClassification.classify(item)
+                Label {
+                    Text(item.name)
+                } icon: {
+                    Image(systemName: classification.category.systemImage)
+                        .foregroundStyle(classification.category.color)
+                }
                     .lineLimit(1)
+                    .help(item.name)
             }
+            TableColumn("Category") { item in
+                Text(ItemClassification.classify(item).category.rawValue)
+                    .foregroundStyle(.secondary)
+            }
+            .width(min: 90, ideal: 110)
             TableColumn("Size", value: \.allocatedSize) { item in
                 Text(item.allocatedSize, format: .byteCount(style: .file))
                     .monospacedDigit()
@@ -156,6 +178,34 @@ private struct ResultsTable: View {
             .width(min: 105, ideal: 125)
         }
         .onTapGesture(count: 2, perform: model.openSelectedFolder)
+    }
+}
+
+private struct EmptyResultsView: View {
+    let searchText: String
+    let hasActiveFilters: Bool
+    let clearFilters: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(
+                hasActiveFilters ? "No matching items" : "This folder is empty",
+                systemImage: hasActiveFilters ? "line.3.horizontal.decrease.circle" : "folder"
+            )
+        } description: {
+            if !hasActiveFilters {
+                Text("SpaceLens didn’t find any visible files or folders here.")
+            } else if searchText.isEmpty {
+                Text("No files or folders match the selected filters.")
+            } else {
+                Text("No files or folders match “\(searchText)”.")
+            }
+        } actions: {
+            if hasActiveFilters {
+                Button("Clear search and filters", action: clearFilters)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -193,10 +243,11 @@ private struct InspectorView: View {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(item.name)
-                                .font(.headline)
+                                .font(.title3.weight(.semibold))
                                 .textSelection(.enabled)
-                            Text(item.kind.rawValue.capitalized)
-                                .foregroundStyle(.secondary)
+                            Label(classification.category.rawValue, systemImage: classification.category.systemImage)
+                                .font(.callout)
+                                .foregroundStyle(classification.category.color)
                         }
                     }
                 }
@@ -230,17 +281,29 @@ private struct InspectorView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Section {
+                Section("Actions") {
                     Button("Quick Look", systemImage: "eye", action: preview)
                         .disabled(!canPreview)
                         .keyboardShortcut(.space, modifiers: [])
                     Button("Reveal in Finder", action: reveal)
                         .keyboardShortcut(.return, modifiers: [.command])
+                }
+
+                Section("Removal") {
                     Button(role: .destructive, action: requestMoveToTrash) {
                         Label("Move to Trash", systemImage: "trash")
                     }
                     .disabled(!canMoveToTrash)
                     .keyboardShortcut(.delete, modifiers: [.command])
+                    if !canMoveToTrash {
+                        Text("Unavailable for protected or incompletely scanned items.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("You’ll be asked to confirm before anything moves.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .formStyle(.grouped)
