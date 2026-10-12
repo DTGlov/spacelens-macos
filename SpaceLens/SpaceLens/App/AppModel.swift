@@ -40,6 +40,52 @@ final class AppModel {
         }
     }
 
+    enum InsightFilter: String, CaseIterable, Identifiable {
+        case all
+        case largeFiles
+        case notModifiedInYear
+
+        var id: Self { self }
+
+        var title: String {
+            switch self {
+            case .all: "All items"
+            case .largeFiles: "Large files"
+            case .notModifiedInYear: "Not modified in 1 year"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .all: "square.grid.2x2"
+            case .largeFiles: "externaldrive.fill.badge.plus"
+            case .notModifiedInYear: "clock.arrow.trianglehead.counterclockwise.rotate.90"
+            }
+        }
+
+        func matches(_ item: ScanItem, referenceDate: Date = .now) -> Bool {
+            switch self {
+            case .all:
+                return true
+            case .largeFiles:
+                return !item.isFolder && item.allocatedSize >= 1_000_000_000
+            case .notModifiedInYear:
+                guard !item.isFolder, let modificationDate = item.modificationDate else { return false }
+                let cutoff = Calendar.current.date(
+                    byAdding: .year,
+                    value: -1,
+                    to: referenceDate
+                ) ?? referenceDate
+                return modificationDate <= cutoff
+            }
+        }
+    }
+
+    struct InsightSummary: Equatable {
+        let itemCount: Int
+        let allocatedSize: Int64
+    }
+
     enum Phase: Equatable {
         case welcome
         case scanning
@@ -64,6 +110,7 @@ final class AppModel {
     var searchText = ""
     var itemFilter: ItemFilter = .all
     var minimumSizeFilter: MinimumSizeFilter = .any
+    var insightFilter: InsightFilter = .all
     @ObservationIgnored
     var sortOrder: [KeyPathComparator<ScanItem>]
 
@@ -103,24 +150,37 @@ final class AppModel {
         let filteredItems = items.filter { item in
             let matchesSearch = FileNameSearch.matches(item.name, query: searchText)
             let matchesMinimumSize = item.allocatedSize >= minimumSizeFilter.bytes
+            let matchesInsight = insightFilter.matches(item)
             let matchesFilter = switch itemFilter {
             case .all: true
             case .folders: item.isFolder
             case .files: !item.isFolder
             }
-            return matchesSearch && matchesMinimumSize && matchesFilter
+            return matchesSearch && matchesMinimumSize && matchesInsight && matchesFilter
         }
         return Array(filteredItems.sorted(using: sortOrder).prefix(100))
     }
 
     var hasActiveFilters: Bool {
-        !searchText.isEmpty || itemFilter != .all || minimumSizeFilter != .any
+        !searchText.isEmpty
+            || itemFilter != .all
+            || minimumSizeFilter != .any
+            || insightFilter != .all
     }
 
     func clearFilters() {
         searchText = ""
         itemFilter = .all
         minimumSizeFilter = .any
+        insightFilter = .all
+    }
+
+    func insightSummary(for insight: InsightFilter) -> InsightSummary {
+        let matchingItems = items.filter { insight.matches($0) }
+        return InsightSummary(
+            itemCount: matchingItems.count,
+            allocatedSize: matchingItems.reduce(0) { $0 + $1.allocatedSize }
+        )
     }
 
     var breadcrumbs: [URL] {
@@ -190,6 +250,7 @@ final class AppModel {
         searchText = ""
         itemFilter = .all
         minimumSizeFilter = .any
+        insightFilter = .all
         items = []
         selection = nil
         progress = ScanProgress()
