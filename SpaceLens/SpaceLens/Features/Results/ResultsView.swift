@@ -178,6 +178,8 @@ private struct InspectorView: View {
 
     var body: some View {
         if let item {
+            let classification = ItemClassification.classify(item)
+            let safetyAssessment = SafetyAssessment.assess(item, classification: classification)
             Form {
                 Section {
                     HStack(spacing: 14) {
@@ -196,6 +198,7 @@ private struct InspectorView: View {
                 }
 
                 Section("Details") {
+                    LabeledContent("Category", value: classification.category.rawValue)
                     LabeledContent("Size", value: item.allocatedSize.formatted(.byteCount(style: .file)))
                     LabeledContent("Logical size", value: item.logicalSize.formatted(.byteCount(style: .file)))
                     if let modificationDate = item.modificationDate {
@@ -209,6 +212,18 @@ private struct InspectorView: View {
                             .truncationMode(.middle)
                             .textSelection(.enabled)
                     }
+                }
+
+                Section("Deletion guidance") {
+                    Label(safetyAssessment.level.rawValue, systemImage: safetyAssessment.systemImage)
+                        .font(.headline)
+                    Text(safetyAssessment.reason)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("This is guidance, not a guarantee. SpaceLens never removes files automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section {
@@ -227,6 +242,16 @@ private struct InspectorView: View {
                 systemImage: "sidebar.right",
                 description: Text("Choose a file or folder to inspect it.")
             )
+        }
+    }
+}
+
+private extension SafetyAssessment {
+    var systemImage: String {
+        switch level {
+        case .knownReproducible: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .reviewCarefully: "exclamationmark.triangle"
+        case .protectedOrUnknown: "lock.shield"
         }
     }
 }

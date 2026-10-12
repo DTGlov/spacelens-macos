@@ -175,6 +175,74 @@ struct FilePreviewTests {
     }
 }
 
+struct ItemClassificationTests {
+  @Test(arguments: [
+    ("backup.zip", ItemClassification.Category.archive),
+    ("movie.mp4", ItemClassification.Category.video),
+    ("photo.heic", ItemClassification.Category.image),
+    ("notes.pdf", ItemClassification.Category.document),
+    ("main.swift", ItemClassification.Category.developer),
+  ])
+  func classifiesCommonFileTypes(name: String, expectedCategory: ItemClassification.Category) {
+    let item = scanItem(path: "/Users/example/Downloads/\(name)")
+
+    #expect(ItemClassification.classify(item).category == expectedCategory)
+  }
+
+  @Test
+  func recognizesApplicationBundles() {
+    let item = scanItem(path: "/Applications/Example.app", kind: .folder)
+
+    #expect(ItemClassification.classify(item).category == .application)
+  }
+}
+
+struct SafetyAssessmentTests {
+  @Test
+  func recognizesOnlySpecificReproducibleLocations() {
+    let cache = assessment(for: "/Users/example/Library/Caches/com.example/cache.bin")
+    let derivedData = assessment(
+      for: "/Users/example/Library/Developer/Xcode/DerivedData/App/Build")
+
+    #expect(cache.level == .knownReproducible)
+    #expect(derivedData.level == .knownReproducible)
+  }
+
+  @Test
+  func requiresReviewForDownloadsAndUserContent() {
+    #expect(assessment(for: "/Users/example/Downloads/archive.zip").level == .reviewCarefully)
+    #expect(assessment(for: "/Users/example/Documents/budget.xlsx").level == .reviewCarefully)
+  }
+
+  @Test
+  func protectsSystemCredentialsAndUnknownLocations() {
+    #expect(
+      assessment(for: "/System/Library/CoreServices/Finder.app", kind: .folder).level
+        == .protectedOrUnknown)
+    #expect(assessment(for: "/Users/example/.ssh/id_ed25519").level == .protectedOrUnknown)
+    #expect(assessment(for: "/Volumes/External/mystery.bin").level == .protectedOrUnknown)
+  }
+
+  private func assessment(for path: String, kind: ScanItem.Kind = .file) -> SafetyAssessment {
+    let item = scanItem(path: path, kind: kind)
+    return SafetyAssessment.assess(item, classification: ItemClassification.classify(item))
+  }
+}
+
+private func scanItem(path: String, kind: ScanItem.Kind = .file) -> ScanItem {
+  let url = URL(fileURLWithPath: path)
+  return ScanItem(
+    id: url,
+    url: url,
+    name: url.lastPathComponent,
+    kind: kind,
+    logicalSize: 0,
+    allocatedSize: 0,
+    modificationDate: nil,
+    skippedItemCount: 0
+  )
+}
+
 private extension CGRect {
     var area: CGFloat { width * height }
 }
