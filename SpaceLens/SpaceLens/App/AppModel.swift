@@ -113,6 +113,16 @@ final class AppModel {
         return Array(filteredItems.sorted(using: sortOrder).prefix(100))
     }
 
+    var hasActiveFilters: Bool {
+        !searchText.isEmpty || itemFilter != .all || minimumSizeFilter != .any
+    }
+
+    func clearFilters() {
+        searchText = ""
+        itemFilter = .all
+        minimumSizeFilter = .any
+    }
+
     var breadcrumbs: [URL] {
         guard let authorizedScope, let rootURL else { return [] }
         return authorizedScope.breadcrumbs(to: rootURL)

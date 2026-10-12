@@ -20,8 +20,7 @@ struct TreemapView: View {
           let item = items[entry.index]
           TreemapTile(
             item: item,
-            isSelected: selection == item.id,
-            shade: shade(for: entry.index)
+            isSelected: selection == item.id
           ) {
             selection = item.id
           }
@@ -41,29 +40,30 @@ struct TreemapView: View {
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Storage treemap")
   }
-
-  private func shade(for index: Int) -> Double {
-    let shades = [0.92, 0.78, 0.66, 0.56, 0.46]
-    return shades[index % shades.count]
-  }
 }
 
 private struct TreemapTile: View {
   let item: ScanItem
   let isSelected: Bool
-  let shade: Double
   let select: () -> Void
+
+  @Environment(\.colorSchemeContrast) private var colorSchemeContrast
 
   var body: some View {
     Button(action: select) {
       GeometryReader { proxy in
+        let classification = ItemClassification.classify(item)
         ZStack(alignment: .topLeading) {
           RoundedRectangle(cornerRadius: 5, style: .continuous)
-            .fill(Color.accentColor.opacity(shade))
+            .fill(classification.category.color.gradient)
+            .overlay {
+              RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(.black.opacity(colorSchemeContrast == .increased ? 0.24 : 0.12))
+            }
 
           if proxy.size.width >= 72, proxy.size.height >= 42 {
             VStack(alignment: .leading, spacing: 2) {
-              Label(item.name, systemImage: item.isFolder ? "folder.fill" : "doc.fill")
+              Label(item.name, systemImage: classification.category.systemImage)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
               Text(item.allocatedSize, format: .byteCount(style: .file))
@@ -79,7 +79,7 @@ private struct TreemapTile: View {
           RoundedRectangle(cornerRadius: 5, style: .continuous)
             .strokeBorder(
               isSelected ? Color.primary : Color.primary.opacity(0.12),
-              lineWidth: isSelected ? 3 : 1
+              lineWidth: isSelected ? 4 : (colorSchemeContrast == .increased ? 2 : 1)
             )
         }
       }
@@ -87,9 +87,13 @@ private struct TreemapTile: View {
     }
     .buttonStyle(.plain)
     .accessibilityLabel(item.name)
-    .accessibilityValue(item.allocatedSize.formatted(.byteCount(style: .file)))
+    .accessibilityValue(
+      "\(ItemClassification.classify(item).category.rawValue), \(item.allocatedSize.formatted(.byteCount(style: .file)))"
+    )
     .accessibilityHint("Selects this item for more details")
     .accessibilityAddTraits(isSelected ? .isSelected : [])
-    .help("\(item.name) — \(item.allocatedSize.formatted(.byteCount(style: .file)))")
+    .help(
+      "\(item.name) — \(ItemClassification.classify(item).category.rawValue) — \(item.allocatedSize.formatted(.byteCount(style: .file)))"
+    )
   }
 }
