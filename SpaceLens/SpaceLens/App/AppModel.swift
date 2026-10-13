@@ -115,6 +115,7 @@ final class AppModel {
     private(set) var rootURL: URL?
     private(set) var authorizedScope: AuthorizedScanScope?
     private(set) var excludedURLs: Set<URL> = []
+    private(set) var volumeCapacity: VolumeCapacity?
     private(set) var items: [ScanItem] = []
     private(set) var progress = ScanProgress()
     var selection: ScanItem.ID? {
@@ -195,6 +196,10 @@ final class AppModel {
             || insightFilter != .all
     }
 
+    var folderDiskShare: Double? {
+        volumeCapacity?.folderShare(for: progress.discoveredSize)
+    }
+
     func clearFilters() {
         searchText = ""
         itemFilter = .all
@@ -208,6 +213,14 @@ final class AppModel {
             itemCount: matchingItems.count,
             allocatedSize: matchingItems.reduce(0) { $0 + $1.allocatedSize }
         )
+    }
+
+    func toggleInsight(_ insight: InsightFilter) {
+        insightFilter = insightFilter == insight ? .all : insight
+    }
+
+    func showOverview() {
+        insightFilter = .all
     }
 
     var breadcrumbs: [URL] {
@@ -293,6 +306,7 @@ final class AppModel {
         cancelDuplicateScan()
         isDuplicateFinderPresented = false
         authorizedScope = AuthorizedScanScope(rootURL: url)
+        volumeCapacity = authorizedScope.flatMap { VolumeCapacity.load(containing: $0.rootURL) }
         self.excludedURLs = normalizedExclusions(
             Set(excludedURLs.map { $0.standardizedFileURL.resolvingSymlinksInPath() })
         )
