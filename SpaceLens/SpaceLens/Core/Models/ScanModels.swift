@@ -24,6 +24,7 @@ struct ScanProgress: Equatable, Sendable {
     var discoveredSize: Int64 = 0
     var scannedItemCount = 0
     var skippedItemCount = 0
+    var excludedFolderCount = 0
     var currentPath = ""
 }
 

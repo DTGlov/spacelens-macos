@@ -4,6 +4,17 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    struct ScanSetup: Identifiable, Equatable {
+        let id = UUID()
+        let rootURL: URL
+        var excludedURLs: Set<URL>
+    }
+
+    struct ScanSetupAlert: Identifiable {
+        let id = UUID()
+        let message: String
+    }
+
     struct TrashAlert: Identifiable {
         enum Kind {
             case confirmation(TrashRequest)
@@ -103,6 +114,7 @@ final class AppModel {
     private(set) var phase: Phase = .welcome
     private(set) var rootURL: URL?
     private(set) var authorizedScope: AuthorizedScanScope?
+    private(set) var excludedURLs: Set<URL> = []
     private(set) var items: [ScanItem] = []
     private(set) var progress = ScanProgress()
     var selection: ScanItem.ID? {
@@ -114,6 +126,8 @@ final class AppModel {
     }
     var previewURL: URL?
     var trashAlert: TrashAlert?
+    var scanSetup: ScanSetup?
+    var scanSetupAlert: ScanSetupAlert?
     var searchText = ""
     var itemFilter: ItemFilter = .all
     var minimumSizeFilter: MinimumSizeFilter = .any
@@ -218,13 +232,70 @@ final class AppModel {
         panel.allowsMultipleSelection = false
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        beginSession(at: url)
+        scanSetup = ScanSetup(
+            rootURL: url.standardizedFileURL.resolvingSymlinksInPath(),
+            excludedURLs: []
+        )
     }
 
-    func beginSession(at url: URL) {
+    func chooseExcludedFolders() {
+        guard var scanSetup else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Choose folders to exclude"
+        panel.prompt = "Exclude"
+        panel.message = "Choose subfolders inside \(scanSetup.rootURL.lastPathComponent)."
+        panel.directoryURL = scanSetup.rootURL
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+
+        guard panel.runModal() == .OK else { return }
+        let scope = AuthorizedScanScope(rootURL: scanSetup.rootURL)
+        let validURLs = panel.urls
+            .map { $0.standardizedFileURL.resolvingSymlinksInPath() }
+            .filter { scope.contains($0) && $0 != scope.rootURL }
+        guard !validURLs.isEmpty else {
+            scanSetupAlert = ScanSetupAlert(
+                message: "Choose one or more subfolders inside the selected scan folder."
+            )
+            return
+        }
+        scanSetup.excludedURLs.formUnion(validURLs)
+        scanSetup.excludedURLs = normalizedExclusions(scanSetup.excludedURLs)
+        self.scanSetup = scanSetup
+        if validURLs.count != panel.urls.count {
+            scanSetupAlert = ScanSetupAlert(
+                message: "Folders outside the selected scan folder were ignored."
+            )
+        }
+    }
+
+    func removeExcludedFolder(_ url: URL) {
+        scanSetup?.excludedURLs.remove(url)
+    }
+
+    func editScanSetup() {
+        guard let authorizedScope else { return }
+        scanSetup = ScanSetup(rootURL: authorizedScope.rootURL, excludedURLs: excludedURLs)
+    }
+
+    func startConfiguredScan() {
+        guard let scanSetup else { return }
+        self.scanSetup = nil
+        beginSession(at: scanSetup.rootURL, excluding: scanSetup.excludedURLs)
+    }
+
+    func cancelScanSetup() {
+        scanSetup = nil
+    }
+
+    func beginSession(at url: URL, excluding excludedURLs: Set<URL> = []) {
         cancelDuplicateScan()
         isDuplicateFinderPresented = false
         authorizedScope = AuthorizedScanScope(rootURL: url)
+        self.excludedURLs = normalizedExclusions(
+            Set(excludedURLs.map { $0.standardizedFileURL.resolvingSymlinksInPath() })
+        )
         backStack = []
         cachedResults = [:]
         loadFolder(at: authorizedScope?.rootURL ?? url)
@@ -279,9 +350,9 @@ final class AppModel {
         let currentScanID = UUID()
         scanID = currentScanID
 
-        scanTask = Task { [weak self, scanner] in
+        scanTask = Task { [weak self, scanner, excludedURLs] in
             do {
-                for try await event in scanner.scan(url: canonicalURL) {
+                for try await event in scanner.scan(url: canonicalURL, excluding: excludedURLs) {
                     guard !Task.isCancelled else { return }
                     guard self?.scanID == currentScanID else { return }
                     switch event {
@@ -357,9 +428,12 @@ final class AppModel {
         guard let authorizedScope else { return }
         cancelDuplicateScan()
         duplicateScanState = .scanning(DuplicateScanProgress())
-        duplicateScanTask = Task { [weak self, duplicateFinder] in
+        duplicateScanTask = Task { [weak self, duplicateFinder, excludedURLs] in
             do {
-                for try await event in duplicateFinder.findDuplicates(in: authorizedScope) {
+                for try await event in duplicateFinder.findDuplicates(
+                    in: authorizedScope,
+                    excluding: excludedURLs
+                ) {
                     guard !Task.isCancelled else { return }
                     switch event {
                     case .progress(let progress):
@@ -440,5 +514,14 @@ final class AppModel {
                 message: error.localizedDescription
             )
         )
+    }
+
+    private func normalizedExclusions(_ urls: Set<URL>) -> Set<URL> {
+        Set(urls.filter { candidate in
+            !urls.contains { possibleParent in
+                possibleParent != candidate
+                    && candidate.pathComponents.starts(with: possibleParent.pathComponents)
+            }
+        })
     }
 }

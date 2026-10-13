@@ -45,6 +45,9 @@ struct ContentView: View {
         .sheet(isPresented: $model.isDuplicateFinderPresented, onDismiss: model.cancelDuplicateScan) {
             DuplicateFinderView(model: model)
         }
+        .sheet(item: $model.scanSetup) { _ in
+            ScanSetupView(model: model)
+        }
     }
 }
 
