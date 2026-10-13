@@ -1,0 +1,40 @@
+name: Unsigned beta package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Artifact label
+        required: true
+        default: 0.1.0-beta.1
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build unsigned beta
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Package unsigned beta
+        env:
+          RELEASE_LABEL: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./scripts/package-unsigned-beta.sh "$RELEASE_LABEL"
+
+      - name: Upload unsigned package
+        uses: actions/upload-artifact@v7
+        with:
+          name: SpaceLens-${{ inputs.version }}-unsigned
+          path: |
+            .build/release/SpaceLens-${{ inputs.version }}-unsigned.dmg
+            .build/release/SpaceLens-${{ inputs.version }}-unsigned.dmg.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

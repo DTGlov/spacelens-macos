@@ -165,21 +165,30 @@ struct ResultsView: View {
     }
 
     private var insights: some View {
-        HStack(spacing: 10) {
-            Text("Insights")
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Insights", systemImage: "sparkles")
                 .font(.headline)
-            ForEach([AppModel.InsightFilter.largeFiles, .notModifiedInYear]) { insight in
-                let summary = model.insightSummary(for: insight)
-                InsightButton(
-                    insight: insight,
-                    summary: summary,
-                    isSelected: model.insightFilter == insight
-                ) {
-                    model.insightFilter = model.insightFilter == insight ? .all : insight
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                ForEach([AppModel.InsightFilter.largeFiles, .notModifiedInYear]) { insight in
+                    let summary = model.insightSummary(for: insight)
+                    InsightButton(
+                        insight: insight,
+                        summary: summary,
+                        isSelected: model.insightFilter == insight
+                    ) {
+                        model.insightFilter = model.insightFilter == insight ? .all : insight
+                    }
                 }
+                InsightCardButton(
+                    title: "Find duplicates",
+                    detail: "Compare exact copies",
+                    systemImage: "doc.on.doc",
+                    accessibilityHint: "Opens the duplicate finder",
+                    action: model.presentDuplicateFinder
+                )
             }
-            Button("Find duplicates", systemImage: "doc.on.doc", action: model.presentDuplicateFinder)
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -218,34 +227,57 @@ private struct InsightButton: View {
     let action: () -> Void
 
     var body: some View {
+        InsightCardButton(
+            title: insight.title,
+            detail: "\(summary.itemCount.formatted()) files · \(summary.allocatedSize.formatted(.byteCount(style: .file)))",
+            systemImage: insight.systemImage,
+            isSelected: isSelected,
+            accessibilityLabel: "\(insight.title), \(summary.itemCount) files, \(summary.allocatedSize.formatted(.byteCount(style: .file)))",
+            accessibilityHint: isSelected ? "Shows all items" : "Filters the storage map and file list",
+            action: action
+        )
+    }
+}
+
+private struct InsightCardButton: View {
+    let title: String
+    let detail: String
+    let systemImage: String
+    var isSelected = false
+    var accessibilityLabel: String?
+    let accessibilityHint: String
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: insight.systemImage)
-                    .font(.title3)
+            HStack(spacing: 9) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.medium))
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .frame(width: 24)
+                    .frame(width: 22)
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(insight.title)
+                    Text(title)
                         .font(.callout.weight(.semibold))
-                    Text(
-                        "\(summary.itemCount.formatted()) files · \(summary.allocatedSize.formatted(.byteCount(style: .file)))"
-                    )
+                        .lineLimit(1)
+                    Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .frame(minWidth: 190, alignment: .leading)
-            .background(
+            .frame(minWidth: 160, maxWidth: 190, minHeight: 48, alignment: .leading)
+            .background {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(
                         isSelected
                             ? Color.accentColor.opacity(0.12)
                             : Color(nsColor: .controlBackgroundColor)
                     )
-            )
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(
@@ -255,10 +287,8 @@ private struct InsightButton: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(
-            "\(insight.title), \(summary.itemCount) files, \(summary.allocatedSize.formatted(.byteCount(style: .file)))"
-        )
-        .accessibilityHint(isSelected ? "Shows all items" : "Filters the storage map and file list")
+        .accessibilityLabel(Text(accessibilityLabel ?? title))
+        .accessibilityHint(accessibilityHint)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
