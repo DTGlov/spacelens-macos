@@ -13,6 +13,7 @@ Explain important design, architecture, dependency, or filesystem-safety decisio
 - [ ] I reviewed the complete diff for unrelated changes and private data
 - [ ] I added or updated focused tests where appropriate
 - [ ] I verified the running app when the change affects the interface
+- [ ] I removed personal filenames, paths, file contents, and credentials from submitted material
 
 ## Safety and privacy
 
