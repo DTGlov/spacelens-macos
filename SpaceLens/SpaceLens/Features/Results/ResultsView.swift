@@ -13,6 +13,9 @@ struct ResultsView: View {
                 Divider()
                 summary(displayedItemCount: displayedItems.count)
                 insights
+                if !model.excludedURLs.isEmpty {
+                    exclusions
+                }
                 Divider()
                 if displayedItems.isEmpty {
                     EmptyResultsView(
@@ -145,6 +148,13 @@ struct ResultsView: View {
                     .foregroundStyle(.orange)
                     .help("Some items could not be read or were outside the selected filesystem.")
             }
+            if model.progress.excludedFolderCount > 0 {
+                Label(
+                    "\(model.progress.excludedFolderCount.formatted()) excluded",
+                    systemImage: "folder.badge.minus"
+                )
+                .help("Excluded folders were not read or included in results.")
+            }
             Spacer()
             Text("Showing \(displayedItemCount.formatted()) of \(model.items.count.formatted())")
                 .foregroundStyle(.secondary)
@@ -174,6 +184,30 @@ struct ResultsView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var exclusions: some View {
+        HStack(spacing: 8) {
+            Label("Excluded", systemImage: "folder.badge.minus")
+                .font(.callout.weight(.semibold))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(model.excludedURLs.sorted(by: { $0.path < $1.path }), id: \.self) { url in
+                        Text(url.lastPathComponent)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(Capsule())
+                            .help(url.path)
+                    }
+                }
+            }
+            Button("Change exclusions…", action: model.editScanSetup)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
     }
 }
 

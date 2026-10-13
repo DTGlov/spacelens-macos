@@ -60,8 +60,31 @@ struct DirectoryScannerTests {
         #expect(receivedFinishedEvent == false)
     }
 
-    private func completedResult(from scanner: DirectoryScanner, url: URL) async throws -> ScanResult {
-        for try await event in scanner.scan(url: url) {
+    @Test
+    func excludesSelectedSubfoldersWithoutReadingTheirContents() async throws {
+        let fixture = try TemporaryDirectory()
+        let excludedFolder = fixture.url.appending(path: "Excluded", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: excludedFolder, withIntermediateDirectories: true)
+        try Data(repeating: 1, count: 2_048).write(to: excludedFolder.appending(path: "hidden.bin"))
+        try Data(repeating: 1, count: 512).write(to: fixture.url.appending(path: "visible.bin"))
+
+        let result = try await completedResult(
+            from: DirectoryScanner(progressInterval: 1),
+            url: fixture.url,
+            excluding: [excludedFolder.standardizedFileURL.resolvingSymlinksInPath()]
+        )
+
+        #expect(result.items.map(\.name) == ["visible.bin"])
+        #expect(result.progress.discoveredSize == result.items.first?.allocatedSize)
+        #expect(result.progress.excludedFolderCount == 1)
+    }
+
+    private func completedResult(
+        from scanner: DirectoryScanner,
+        url: URL,
+        excluding excludedURLs: Set<URL> = []
+    ) async throws -> ScanResult {
+        for try await event in scanner.scan(url: url, excluding: excludedURLs) {
             if case .finished(let result) = event {
                 return result
             }

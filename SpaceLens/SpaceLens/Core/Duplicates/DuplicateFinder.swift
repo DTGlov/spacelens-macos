@@ -70,11 +70,14 @@ actor DuplicateFinder {
         self.chunkSize = max(chunkSize, 4_096)
     }
 
-    nonisolated func findDuplicates(in scope: AuthorizedScanScope) -> AsyncThrowingStream<DuplicateScanEvent, Error> {
+    nonisolated func findDuplicates(
+        in scope: AuthorizedScanScope,
+        excluding excludedURLs: Set<URL> = []
+    ) -> AsyncThrowingStream<DuplicateScanEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let groups = try await findDuplicates(in: scope) { progress in
+                    let groups = try await findDuplicates(in: scope, excluding: excludedURLs) { progress in
                         continuation.yield(.progress(progress))
                     }
                     continuation.yield(.finished(groups))
@@ -89,10 +92,16 @@ actor DuplicateFinder {
 
     private func findDuplicates(
         in scope: AuthorizedScanScope,
+        excluding excludedURLs: Set<URL>,
         progressHandler: @Sendable (DuplicateScanProgress) -> Void
     ) throws -> [DuplicateGroup] {
         var progress = DuplicateScanProgress()
-        let candidates = try discoverCandidates(in: scope, progress: &progress, handler: progressHandler)
+        let candidates = try discoverCandidates(
+            in: scope,
+            excluding: excludedURLs,
+            progress: &progress,
+            handler: progressHandler
+        )
         let sizeGroups = Dictionary(grouping: candidates, by: { $0.file.logicalSize })
             .filter { $0.value.count > 1 }
         progress.stage = .hashing
@@ -133,6 +142,7 @@ actor DuplicateFinder {
 
     private func discoverCandidates(
         in scope: AuthorizedScanScope,
+        excluding excludedURLs: Set<URL>,
         progress: inout DuplicateScanProgress,
         handler: @Sendable (DuplicateScanProgress) -> Void
     ) throws -> [Candidate] {
@@ -161,6 +171,10 @@ actor DuplicateFinder {
         while let url = enumerator.nextObject() as? URL {
             try Task.checkCancellation()
             progress.currentPath = url.path
+            if excludedURLs.contains(url.standardizedFileURL.resolvingSymlinksInPath()) {
+                enumerator.skipDescendants()
+                continue
+            }
             do {
                 let values = try url.resourceValues(forKeys: keys)
                 if values.isSymbolicLink == true {

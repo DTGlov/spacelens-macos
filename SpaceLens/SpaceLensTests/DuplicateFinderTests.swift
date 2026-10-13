@@ -86,11 +86,29 @@ struct DuplicateFinderTests {
         #expect(receivedFinishedEvent == false)
     }
 
+    @Test
+    func respectsExcludedSubfolders() async throws {
+        let fixture = try DuplicateFixture()
+        let excludedFolder = fixture.url.appending(path: "Excluded", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: excludedFolder, withIntermediateDirectories: true)
+        try Data("duplicate".utf8).write(to: excludedFolder.appending(path: "first.bin"))
+        try Data("duplicate".utf8).write(to: excludedFolder.appending(path: "second.bin"))
+
+        let groups = try await completedGroups(
+            from: DuplicateFinder(),
+            scope: AuthorizedScanScope(rootURL: fixture.url),
+            excluding: [excludedFolder.standardizedFileURL.resolvingSymlinksInPath()]
+        )
+
+        #expect(groups.isEmpty)
+    }
+
     private func completedGroups(
         from finder: DuplicateFinder,
-        scope: AuthorizedScanScope
+        scope: AuthorizedScanScope,
+        excluding excludedURLs: Set<URL> = []
     ) async throws -> [DuplicateGroup] {
-        for try await event in finder.findDuplicates(in: scope) {
+        for try await event in finder.findDuplicates(in: scope, excluding: excludedURLs) {
             if case .finished(let groups) = event {
                 return groups
             }

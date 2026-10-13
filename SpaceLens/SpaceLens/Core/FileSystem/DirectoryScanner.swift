@@ -9,11 +9,14 @@ actor DirectoryScanner {
         self.progressInterval = max(progressInterval, 1)
     }
 
-    nonisolated func scan(url rootURL: URL) -> AsyncThrowingStream<ScanEvent, Error> {
+    nonisolated func scan(
+        url rootURL: URL,
+        excluding excludedURLs: Set<URL> = []
+    ) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let result = try await scanDirectory(rootURL) { progress in
+                    let result = try await scanDirectory(rootURL, excluding: excludedURLs) { progress in
                         continuation.yield(.progress(progress))
                     }
                     continuation.yield(.finished(result))
@@ -29,6 +32,7 @@ actor DirectoryScanner {
 
     private func scanDirectory(
         _ rootURL: URL,
+        excluding excludedURLs: Set<URL>,
         progressHandler: @Sendable (ScanProgress) -> Void
     ) async throws -> ScanResult {
         try Task.checkCancellation()
@@ -61,13 +65,14 @@ actor DirectoryScanner {
 
         for child in children {
             try Task.checkCancellation()
-            let accumulator = try scanTree(
+            guard let accumulator = try scanTree(
                 at: child,
                 rootVolumeIdentifier: rootValues.volumeIdentifier,
                 keys: childKeys,
+                excludedURLs: excludedURLs,
                 progress: &progress,
                 progressHandler: progressHandler
-            )
+            ) else { continue }
             results.append(accumulator.item)
         }
 
@@ -79,11 +84,18 @@ actor DirectoryScanner {
         at url: URL,
         rootVolumeIdentifier: Any?,
         keys: Set<URLResourceKey>,
+        excludedURLs: Set<URL>,
         progress: inout ScanProgress,
         progressHandler: @Sendable (ScanProgress) -> Void
-    ) throws -> (item: ScanItem, logicalSize: Int64, allocatedSize: Int64) {
+    ) throws -> (item: ScanItem, logicalSize: Int64, allocatedSize: Int64)? {
         try Task.checkCancellation()
         progress.currentPath = url.path
+
+        if excludedURLs.contains(url.standardizedFileURL.resolvingSymlinksInPath()) {
+            progress.excludedFolderCount += 1
+            progressHandler(progress)
+            return nil
+        }
 
         let values: URLResourceValues
         do {
@@ -128,13 +140,14 @@ actor DirectoryScanner {
                     options: [.skipsHiddenFiles]
                 )
                 for child in children {
-                    let childResult = try scanTree(
+                    guard let childResult = try scanTree(
                         at: child,
                         rootVolumeIdentifier: rootVolumeIdentifier,
                         keys: keys,
+                        excludedURLs: excludedURLs,
                         progress: &progress,
                         progressHandler: progressHandler
-                    )
+                    ) else { continue }
                     logicalSize += childResult.logicalSize
                     allocatedSize += childResult.allocatedSize
                 }
