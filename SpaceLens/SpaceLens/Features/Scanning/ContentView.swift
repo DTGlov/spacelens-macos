@@ -42,6 +42,9 @@ struct ContentView: View {
                 )
             }
         }
+        .sheet(isPresented: $model.isDuplicateFinderPresented, onDismiss: model.cancelDuplicateScan) {
+            DuplicateFinderView(model: model)
+        }
     }
 }
 

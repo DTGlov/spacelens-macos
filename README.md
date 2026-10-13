@@ -84,6 +84,7 @@ swift run SpaceLens
 - [x] Confirmed Move to Trash workflow
 - [x] Accessibility and performance refinement
 - [x] Large and older file insights
+- [x] Exact duplicate-file finder
 - [ ] Signed release builds
 
 The roadmap is directional rather than a promise of specific release dates. Proposed changes should preserve SpaceLens's conservative safety model.
