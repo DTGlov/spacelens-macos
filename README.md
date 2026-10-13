@@ -73,6 +73,12 @@ Build the native application without signing with:
 
 If you receive an unsigned build from a trusted contributor, read [Running unsigned builds](docs/UNSIGNED_BUILDS.md) before opening it.
 
+Maintainers can create a local test disk image with:
+
+    ./scripts/package-unsigned-beta.sh 0.1.0-beta.1
+
+See [Packaging an unsigned beta](docs/RELEASING.md) for the manual GitHub workflow and tester handoff checklist.
+
 ## Roadmap
 
 - [x] Native sandboxed macOS application

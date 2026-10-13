@@ -2,6 +2,8 @@
 
 SpaceLens does not yet publish signed or notarized releases. The safest way to test it is to build the source in Xcode yourself.
 
+Early testing disk images may be produced by the repository's manual packaging workflow. They are intentionally named `unsigned` and are temporary test artifacts, not stable releases.
+
 ## Before opening an unsigned build
 
 Only accept a build from a contributor you trust. Confirm the source commit it was built from and keep backups of important files. macOS cannot verify the developer identity or notarization status of an unsigned application.
