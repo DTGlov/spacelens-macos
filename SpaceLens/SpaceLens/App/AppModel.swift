@@ -93,6 +93,13 @@ final class AppModel {
         case failed(String)
     }
 
+    enum DuplicateScanState: Equatable {
+        case idle
+        case scanning(DuplicateScanProgress)
+        case finished([DuplicateGroup])
+        case failed(String)
+    }
+
     private(set) var phase: Phase = .welcome
     private(set) var rootURL: URL?
     private(set) var authorizedScope: AuthorizedScanScope?
@@ -111,22 +118,28 @@ final class AppModel {
     var itemFilter: ItemFilter = .all
     var minimumSizeFilter: MinimumSizeFilter = .any
     var insightFilter: InsightFilter = .all
+    var isDuplicateFinderPresented = false
+    private(set) var duplicateScanState: DuplicateScanState = .idle
     @ObservationIgnored
     var sortOrder: [KeyPathComparator<ScanItem>]
 
     private let scanner: DirectoryScanner
     private let trashService: TrashService
+    private let duplicateFinder: DuplicateFinder
     private var scanTask: Task<Void, Never>?
+    private var duplicateScanTask: Task<Void, Never>?
     private var scanID = UUID()
     private var backStack: [URL] = []
     private var cachedResults: [URL: ScanResult] = [:]
 
     init(
         scanner: DirectoryScanner = DirectoryScanner(),
-        trashService: TrashService = TrashService()
+        trashService: TrashService = TrashService(),
+        duplicateFinder: DuplicateFinder = DuplicateFinder()
     ) {
         self.scanner = scanner
         self.trashService = trashService
+        self.duplicateFinder = duplicateFinder
         sortOrder = [KeyPathComparator(\ScanItem.allocatedSize, order: .reverse)]
     }
 
@@ -209,6 +222,8 @@ final class AppModel {
     }
 
     func beginSession(at url: URL) {
+        cancelDuplicateScan()
+        isDuplicateFinderPresented = false
         authorizedScope = AuthorizedScanScope(rootURL: url)
         backStack = []
         cachedResults = [:]
@@ -326,6 +341,73 @@ final class AppModel {
         }
     }
 
+    func presentDuplicateFinder() {
+        isDuplicateFinderPresented = true
+        if case .idle = duplicateScanState {
+            startDuplicateScan()
+        }
+    }
+
+    func dismissDuplicateFinder() {
+        cancelDuplicateScan()
+        isDuplicateFinderPresented = false
+    }
+
+    func startDuplicateScan() {
+        guard let authorizedScope else { return }
+        cancelDuplicateScan()
+        duplicateScanState = .scanning(DuplicateScanProgress())
+        duplicateScanTask = Task { [weak self, duplicateFinder] in
+            do {
+                for try await event in duplicateFinder.findDuplicates(in: authorizedScope) {
+                    guard !Task.isCancelled else { return }
+                    switch event {
+                    case .progress(let progress):
+                        self?.duplicateScanState = .scanning(progress)
+                    case .finished(let groups):
+                        self?.duplicateScanState = .finished(groups)
+                    }
+                }
+            } catch is CancellationError {
+                guard self?.isDuplicateFinderPresented == true else { return }
+                self?.duplicateScanState = .idle
+            } catch {
+                self?.duplicateScanState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelDuplicateScan() {
+        duplicateScanTask?.cancel()
+        duplicateScanTask = nil
+        if case .scanning = duplicateScanState {
+            duplicateScanState = .idle
+        }
+    }
+
+    func previewDuplicate(_ file: DuplicateFile) {
+        previewURL = file.url
+    }
+
+    func revealDuplicate(_ file: DuplicateFile) {
+        NSWorkspace.shared.activateFileViewerSelecting([file.url])
+    }
+
+    func requestMoveDuplicateToTrash(_ file: DuplicateFile) {
+        guard let authorizedScope else { return }
+        Task { [weak self, trashService] in
+            do {
+                let request = try await trashService.prepare(
+                    item: file.scanItem,
+                    authorizedScope: authorizedScope
+                )
+                self?.trashAlert = TrashAlert(kind: .confirmation(request))
+            } catch {
+                self?.presentTrashError(error)
+            }
+        }
+    }
+
     func confirmMoveToTrash(_ request: TrashRequest) {
         Task { [weak self, trashService] in
             do {
@@ -335,6 +417,9 @@ final class AppModel {
                 cachedResults = [:]
                 if let folderToReload {
                     loadFolder(at: folderToReload)
+                }
+                if isDuplicateFinderPresented {
+                    startDuplicateScan()
                 }
                 trashAlert = TrashAlert(
                     kind: .message(

@@ -168,6 +168,7 @@ struct ResultsView: View {
                     model.insightFilter = model.insightFilter == insight ? .all : insight
                 }
             }
+            Button("Find duplicates", systemImage: "doc.on.doc", action: model.presentDuplicateFinder)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 14)
