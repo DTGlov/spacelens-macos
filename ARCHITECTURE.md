@@ -1,124 +1,76 @@
 # SpaceLens architecture
 
-## Decision
+## Overview
 
-Version one is a native macOS application built with Swift and SwiftUI. Filesystem scanning uses Foundation APIs with bounded concurrency. Rust is intentionally deferred until measurement demonstrates a meaningful bottleneck or a reusable cross-platform engine becomes a product requirement.
+SpaceLens is a native macOS application built with Swift, SwiftUI, AppKit, Foundation, CryptoKit, and Quick Look. Rust is deferred until measurement identifies a meaningful bottleneck or a cross-platform engine becomes a real requirement.
 
-The distributable application is defined by `SpaceLens/SpaceLens.xcodeproj`. The repository also keeps a Swift package manifest over the same source and unit-test directories for fast command-line validation; it is not a second implementation.
+The distributable application is defined by `SpaceLens/SpaceLens.xcodeproj`. `Package.swift` covers the same source and test directories for fast command-line validation. The project has no third-party runtime dependencies.
 
-The application uses a feature-oriented structure with a small shared core. It separates filesystem operations from presentation so scanning and safety decisions can be tested without launching the interface.
+## Boundaries
 
-## Proposed structure
+The source is feature-oriented with a small shared core:
 
-```text
-SpaceLens/
-├── App/
-│   ├── SpaceLensApp.swift
-│   └── AppModel.swift
-├── Core/
-│   ├── FileSystem/
-│   ├── Models/
-│   └── Utilities/
-├── Features/
-│   ├── Welcome/
-│   ├── Scanning/
-│   ├── Results/
-│   ├── Inspector/
-│   └── Cleanup/
-├── Resources/
-└── Tests/
-    ├── ScannerTests/
-    ├── ClassificationTests/
-    └── SafetyTests/
-```
+- `App/` owns scene setup and high-level session state.
+- `Core/FileSystem/` owns authorized scans and Trash operations.
+- `Core/Duplicates/` owns exact duplicate discovery and hashing.
+- `Core/Classification/` owns file categories and deletion guidance.
+- `Core/Models/`, `Preview/`, and `Visualization/` contain shared behavior.
+- `Features/` contains SwiftUI presentation for scanning, results, and duplicates.
 
-Files should be added only when the vertical slice needs them; this tree is a boundary map, not a request to create empty placeholders.
+Filesystem access, classification, safety assessment, duplicate hashing, and Trash operations remain outside views so they can be tested independently.
 
 ## State flow
 
-```text
-Folder authorization
-        ↓
-Scan coordinator ─────→ progress events
-        ↓                       ↓
-Immutable scan snapshot → app model → SwiftUI views
-        ↓
-Selection → inspector → explicit Trash request
-```
+    Folder picker → scan setup → authorized scope + session exclusions
+                                      ↓
+                         scanner / duplicate finder
+                                      ↓
+                             asynchronous events
+                                      ↓
+                             AppModel → views
+                                      ↓
+                        selection → confirmed Trash request
 
-### App model
+`AppModel` owns navigation and session state. Scan snapshots, duplicate groups, exclusions, and caches are not persisted.
 
-The app model owns navigation and high-level session state: selected root, scan status, current snapshot, selection, filters, and presented dialogs. It does not enumerate files or make safety decisions.
+## Storage scanning
 
-### Scan coordinator
+`DirectoryScanner` is actor-isolated and exposes an `AsyncThrowingStream`. It recursively aggregates logical and allocated sizes into each immediate child of the displayed folder. It supports cancellation, skips session exclusions before traversal, avoids symbolic links and other filesystems, records inaccessible entries, and throttles progress updates.
 
-The coordinator starts and cancels scan tasks, limits filesystem concurrency, aggregates partial results, and publishes throttled snapshots. Throttling prevents filesystem events from causing excessive UI redraws.
+## Duplicate detection
 
-### Filesystem scanner
+`DuplicateFinder` performs a separate read-only pass over the authorized root:
 
-The scanner is an `actor`-isolated service with an asynchronous event stream. It reads resource keys in batches, avoids symbolic-link traversal, records inaccessible entries, and supports cooperative cancellation.
+1. Skip hidden entries, packages, symbolic links, exclusions, and other filesystems.
+2. Ignore empty files and collapse hard links sharing one filesystem identity.
+3. Group regular files by logical size.
+4. Stream candidate contents through CryptoKit SHA-256 in bounded chunks.
+5. Revalidate size and modification date before accepting a digest.
+6. Report groups with at least two matching hashes.
 
-Each node records at least:
+Savings are described as potential because compression and APFS clones can affect the actual reclaimed space.
 
-- Stable scan-session identifier
-- URL relative to the authorized root
-- Display name and kind
-- Logical and allocated size when available
-- Modification date
-- Child aggregate information
-- Scan completeness and access errors
+## Classification and safety
 
-The scanner must not retain file contents.
+Classification describes what an item appears to be. `SafetyAssessment` separately controls what SpaceLens may say about removal. A category never automatically makes a file safe.
 
-### Classification and safety
+Guidance is conservative:
 
-Classification describes what an item appears to be. Safety assessment separately determines what SpaceLens may say about removal. Keeping them separate prevents a category such as “cache” from automatically becoming “safe.”
+- **Known reproducible** for specifically recognized caches or build output
+- **Review carefully** for user content, downloads, archives, applications, and duplicates
+- **Protected or unknown** for system locations, sensitive configuration, links, incomplete scans, and unknown locations
 
-Safety explanations are rule-based and testable. The first release should use a conservative allowlist for known reproducible items and label everything else for review or as unknown.
+## Trash operations
 
-### Trash service
+`TrashService` wraps the supported macOS Trash API. Immediately before moving an item it verifies the authorized scope, filesystem identity, scan completeness, and safety policy. SpaceLens never permanently deletes files or empties Trash.
 
-Deletion is represented by a dedicated service wrapping the macOS trash API. Before acting, it verifies that the URL still refers to the item inspected by the user and remains within the authorized scope. It returns an auditable result for every requested item.
+## Persistence and permissions
 
-## Persistence
+- The app uses the App Sandbox with user-selected file read/write access.
+- It does not request Full Disk Access.
+- Security-scoped bookmark persistence is not implemented.
+- No scan data, paths, analytics, or file contents are sent over a network.
 
-Version one needs little persistence:
+## Validation
 
-- Security-scoped bookmarks for explicitly authorized recent locations
-- Lightweight preferences such as view mode and category visibility
-- Cleanup-history metadata
-
-Scan trees are session data and are not persisted initially. SwiftData or a database is unnecessary for the first vertical slice.
-
-## Dependencies
-
-No third-party dependencies are proposed initially.
-
-- SwiftUI and AppKit: application interface and macOS integrations
-- Foundation: enumeration, resource metadata, concurrency, and bookmarks
-- QuickLookUI: previews
-- XCTest: focused scanner, classification, and safety tests
-
-A custom treemap can be drawn with SwiftUI `Canvas` after the list-based slice works. This avoids committing to a chart package before interaction and accessibility requirements are understood.
-
-## macOS configuration
-
-- Target the oldest macOS version that supports the chosen SwiftUI APIs; decide this when creating the Xcode project against the installed toolchain.
-- Enable App Sandbox.
-- Grant user-selected file read/write access.
-- Use security-scoped bookmarks for authorized recent locations.
-- Do not request Full Disk Access for the first release.
-- Add clear usage copy wherever protected-folder access may be requested.
-
-## First vertical slice
-
-The first implementation milestone is intentionally narrow:
-
-1. Create the SwiftUI macOS application target.
-2. Choose one folder through the native picker.
-3. Scan it asynchronously with cancellation and permission-error reporting.
-4. Display the 100 largest immediate descendants in a sortable native table.
-5. Select an item and reveal it in Finder.
-6. Cover aggregation, cancellation, symlink handling, and inaccessible-item behavior with focused tests.
-
-Moving to Trash and the treemap follow only after this slice is reliable. That keeps destructive behavior out of the earliest prototype and gives real scan data for designing the visualization.
+Tests use temporary fixtures rather than personal data. Coverage includes aggregation, cancellation, links, filesystem boundaries, exclusions, duplicate hashes, hard links, classification, identity revalidation, and Trash behavior.

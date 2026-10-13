@@ -1,100 +1,100 @@
 # SpaceLens
 
-SpaceLens is a native macOS storage explorer that helps you understand what is using disk space and where it lives.
+[![CI](https://github.com/DTGlov/spacelens-macos/actions/workflows/ci.yml/badge.svg)](https://github.com/DTGlov/spacelens-macos/actions/workflows/ci.yml)
+![Status](https://img.shields.io/badge/status-pre--release-orange)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-The project is currently an early, non-destructive prototype. It can scan a folder you explicitly choose, rank its largest immediate contents, inspect an item, and reveal it in Finder. It does **not** delete, move, upload, or modify your files.
+SpaceLens is a native macOS storage explorer that turns crowded folders into a clear visual map, highlights unusually large or older files, and finds exact duplicates without uploading file data.
+
+> [!IMPORTANT]
+> SpaceLens is pre-release software. There is no signed public download yet. Build it from source for testing and keep backups of important data.
 
 ## Why SpaceLens?
 
-macOS can tell you that storage is full without making it easy to understand which folders are responsible. SpaceLens aims to make storage usage visual, understandable, and safe to act on.
-
-The product is guided by three questions:
+macOS can report that storage is full without making it easy to understand which folders are responsible. SpaceLens is designed around three questions:
 
 1. What is consuming my storage?
 2. Where is it located?
-3. What can I safely remove?
+3. What should I review before reclaiming space?
 
-## Current capabilities
+SpaceLens gives context rather than declaring unfamiliar files to be junk.
 
-- Choose a folder with the native macOS folder picker.
-- Scan nested files and folders asynchronously.
-- See live discovered size and item-count progress.
-- Cancel an active scan.
-- Browse the 100 largest immediate items in a sortable table.
-- Inspect allocated size, logical size, modification date, and location.
-- Reveal a selected item in Finder.
-- Continue when individual locations cannot be read.
-- Avoid traversing symbolic links or crossing filesystem boundaries.
+## Features
 
-## Safety principles
+- Scan a folder selected through the native macOS folder picker.
+- Exclude chosen subfolders for the current scan session.
+- Explore allocated space through an interactive treemap and sortable table.
+- Navigate folders with breadcrumbs, search, and size/type filters.
+- Highlight files of at least 1 GB and files not modified within one year.
+- Find exact duplicates by grouping on size and confirming content with SHA-256.
+- Preview supported files with Quick Look or reveal them in Finder.
+- Show conservative, explainable deletion guidance.
+- Move one explicitly selected item to Trash after identity and scope revalidation.
+- Cancel active storage and duplicate scans.
+- Continue past individual unreadable entries without aborting the entire scan.
 
-Storage tools operate close to irreplaceable personal data, so safety is part of the architecture rather than a finishing touch.
+## Safety and privacy
 
-- SpaceLens scans only locations the user explicitly chooses.
-- It never follows symbolic links during recursive scans.
-- It does not call an unknown file “junk.”
-- Automatic cleanup and permanent deletion are out of scope.
-- Future removal features will move explicitly selected items to Trash only after confirmation.
-- Filesystem behavior is covered by focused tests using temporary fixtures, never personal files.
+- Scans remain on the Mac; SpaceLens has no networking or analytics dependency.
+- Only explicitly selected locations are scanned.
+- Symbolic links are not followed and scans do not cross filesystem boundaries.
+- Excluded folders are not traversed or checked for duplicates.
+- Duplicate scanning ignores package contents, empty files, and hard links.
+- Unknown files are never labeled as junk or automatically selected.
+- SpaceLens never cleans automatically or permanently deletes files.
+- Files move through the supported macOS Trash API only after explicit confirmation.
+- Identity and authorized scope are revalidated immediately before a Trash operation.
 
-For the complete product and engineering decisions, see [PRODUCT.md](PRODUCT.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+Read [PRODUCT.md](PRODUCT.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [SECURITY.md](SECURITY.md) for the complete policies.
+
+## Project status
+
+SpaceLens is under active development and has not reached its first tagged release. Source builds are intended for contributors and early testers. Signing, notarization, and a downloadable disk image are planned after an Apple Developer account is available.
 
 ## Requirements
 
 - macOS 14 or later
 - Xcode 26 or a compatible Swift 6.2 toolchain
 
-## Run locally
+## Build from source
 
-Clone the repository and enter its directory:
+Clone the repository, open `SpaceLens/SpaceLens.xcodeproj`, select the `SpaceLens` scheme and `My Mac` destination, then press Run.
 
-```sh
-git clone https://github.com/DTGlov/spacelens-macos.git
-cd spacelens-macos
-```
+Run package tests with `swift test`.
 
-Open the native Xcode project:
+Build the native application without signing with:
 
-```sh
-open SpaceLens/SpaceLens.xcodeproj
-```
+    xcodebuild build \
+      -project SpaceLens/SpaceLens.xcodeproj \
+      -scheme SpaceLens \
+      -destination 'platform=macOS' \
+      CODE_SIGNING_ALLOWED=NO
 
-Select the `SpaceLens` scheme and the `My Mac` destination, then press Run.
-
-Build and run the complete Xcode test suite from the command line:
-
-```sh
-xcodebuild test -project SpaceLens/SpaceLens.xcodeproj -scheme SpaceLens -destination 'platform=macOS'
-```
-
-The Swift package remains available for quick scanner tests and command-line development:
-
-```sh
-swift test
-swift run SpaceLens
-```
+If you receive an unsigned build from a trusted contributor, read [Running unsigned builds](docs/UNSIGNED_BUILDS.md) before opening it.
 
 ## Roadmap
 
-- [x] Standard sandboxed macOS `.app` target
-- [x] Interactive storage treemap
-- [x] Folder navigation, filtering, and search
-- [x] Quick Look previews
-- [x] Conservative, explainable safety classifications
+- [x] Native sandboxed macOS application
+- [x] Interactive storage map, navigation, search, and filters
+- [x] Quick Look and explainable safety classifications
 - [x] Confirmed Move to Trash workflow
-- [x] Accessibility and performance refinement
-- [x] Large and older file insights
-- [x] Exact duplicate-file finder
+- [x] Large/older file insights and exact duplicate detection
 - [x] Per-session scan exclusions
-- [ ] Signed release builds
+- [x] Accessibility and scanner performance refinement
+- [x] Open-source community and contribution documentation
+- [ ] Signed, notarized release builds and downloadable disk image
 
-The roadmap is directional rather than a promise of specific release dates. Proposed changes should preserve SpaceLens's conservative safety model.
+The roadmap is directional rather than a promise of dates. Proposed changes must preserve SpaceLens's conservative safety model.
 
 ## Contributing
 
-Contributions, bug reports, design feedback, accessibility improvements, and documentation fixes are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and follow the [Code of Conduct](CODE_OF_CONDUCT.md) in project spaces.
+Contributions, reproducible bug reports, design feedback, accessibility improvements, and documentation fixes are welcome.
 
-Security-sensitive filesystem or deletion issues should be reported privately as described in [SECURITY.md](SECURITY.md).
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+- Follow the [Code of Conduct](CODE_OF_CONDUCT.md) in project spaces.
+- Use GitHub's issue forms for bugs and feature proposals.
+- Report security-sensitive issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

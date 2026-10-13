@@ -23,6 +23,8 @@ open SpaceLens/SpaceLens.xcodeproj
 
 The native application is defined by the Xcode project. A Swift package remains available for fast scanner tests and command-line development. The project has no third-party dependencies.
 
+Unsigned builds are for local development and trusted testing only. Read [Running unsigned builds](docs/UNSIGNED_BUILDS.md) before sharing one, and identify the exact source commit used.
+
 ## Branches
 
 Create each change from the latest `main` branch. Use a short, descriptive branch name:
