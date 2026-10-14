@@ -30,7 +30,7 @@ struct ResultsView: View {
                         items: displayedItems,
                         selection: $model.selection,
                         sortOrder: $model.sortOrder,
-                        openSelectedFolder: model.openSelectedFolder
+                        openFolder: model.openFolder
                     )
                 }
             }
@@ -142,6 +142,9 @@ struct ResultsView: View {
     private func summary(displayedItemCount: Int) -> some View {
         HStack(spacing: 20) {
             Label(model.progress.discoveredSize.formatted(.byteCount(style: .file)), systemImage: "internaldrive")
+            if let volumeCapacity = model.volumeCapacity, let share = model.folderDiskShare {
+                FolderDiskShareBadge(volumeCapacity: volumeCapacity, share: share)
+            }
             Label("\(model.progress.scannedItemCount.formatted()) items", systemImage: "doc.on.doc")
             if model.progress.skippedItemCount > 0 {
                 Label("\(model.progress.skippedItemCount.formatted()) skipped", systemImage: "exclamationmark.triangle")
@@ -166,9 +169,16 @@ struct ResultsView: View {
 
     private var insights: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Insights", systemImage: "sparkles")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+            HStack {
+                Label("Insights", systemImage: "sparkles")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if model.insightFilter != .all {
+                    Button("Show overview", systemImage: "arrow.uturn.backward", action: model.showOverview)
+                        .controlSize(.small)
+                }
+            }
 
             HStack(spacing: 8) {
                 ForEach([AppModel.InsightFilter.largeFiles, .notModifiedInYear]) { insight in
@@ -178,7 +188,7 @@ struct ResultsView: View {
                         summary: summary,
                         isSelected: model.insightFilter == insight
                     ) {
-                        model.insightFilter = model.insightFilter == insight ? .all : insight
+                        model.toggleInsight(insight)
                     }
                 }
                 InsightCardButton(
@@ -217,6 +227,35 @@ struct ResultsView: View {
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 10)
+    }
+}
+
+private struct FolderDiskShareBadge: View {
+    let volumeCapacity: VolumeCapacity
+    let share: Double
+
+    var body: some View {
+        Label {
+            Text(
+                "\(share.formatted(.percent.precision(.fractionLength(1)))) of "
+                    + "\(volumeCapacity.totalBytes.formatted(.byteCount(style: .file))) disk"
+            )
+            .monospacedDigit()
+        } icon: {
+            Image(systemName: "chart.pie.fill")
+                .foregroundStyle(Color.accentColor)
+        }
+        .font(.caption)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(Capsule())
+        .accessibilityLabel("Current folder share of disk")
+        .accessibilityValue(
+            "\(share.formatted(.percent.precision(.fractionLength(1)))) of "
+                + "\(volumeCapacity.totalBytes.formatted(.byteCount(style: .file)))"
+        )
+        .help("The current folder’s estimated allocated size compared with this disk’s total capacity.")
     }
 }
 
@@ -297,7 +336,7 @@ private struct ResultsTable: View {
     let items: [ScanItem]
     @Binding var selection: ScanItem.ID?
     @Binding var sortOrder: [KeyPathComparator<ScanItem>]
-    let openSelectedFolder: () -> Void
+    let openFolder: (ScanItem) -> Void
 
     var body: some View {
         Table(items, selection: $selection, sortOrder: $sortOrder) {
@@ -309,8 +348,12 @@ private struct ResultsTable: View {
                     Image(systemName: classification.category.systemImage)
                         .foregroundStyle(classification.category.color)
                 }
-                    .lineLimit(1)
-                    .help(item.name)
+                .lineLimit(1)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    openFolder(item)
+                }
+                .help(item.name)
             }
             TableColumn("Category") { item in
                 Text(ItemClassification.classify(item).category.rawValue)
@@ -327,7 +370,6 @@ private struct ResultsTable: View {
             }
             .width(min: 105, ideal: 125)
         }
-        .onTapGesture(count: 2, perform: openSelectedFolder)
     }
 }
 
