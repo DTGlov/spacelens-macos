@@ -74,12 +74,13 @@ actor DuplicateFinder {
         in scope: AuthorizedScanScope,
         excluding excludedURLs: Set<URL> = []
     ) -> AsyncThrowingStream<DuplicateScanEvent, Error> {
-        AsyncThrowingStream { continuation in
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let task = Task {
                 do {
                     let groups = try await findDuplicates(in: scope, excluding: excludedURLs) { progress in
                         continuation.yield(.progress(progress))
                     }
+                    try Task.checkCancellation()
                     continuation.yield(.finished(groups))
                     continuation.finish()
                 } catch {
