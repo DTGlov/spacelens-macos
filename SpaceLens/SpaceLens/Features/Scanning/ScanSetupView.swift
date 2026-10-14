@@ -8,9 +8,9 @@ struct ScanSetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Set up this scan")
+                Text(setup?.kind.setupTitle ?? "Set up this scan")
                     .font(.title2.weight(.semibold))
-                Text("Choose any subfolders SpaceLens should leave unread.")
+                Text(setupDescription)
                     .foregroundStyle(.secondary)
             }
 
@@ -90,7 +90,7 @@ struct ScanSetupView: View {
                 Spacer()
                 Button("Cancel", action: model.cancelScanSetup)
                     .keyboardShortcut(.cancelAction)
-                Button("Scan folder", action: model.startConfiguredScan)
+                Button(setup?.kind.startButtonTitle ?? "Scan folder", action: model.startConfiguredScan)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
@@ -103,6 +103,15 @@ struct ScanSetupView: View {
                 message: Text(alert.message),
                 dismissButton: .default(Text("OK"))
             )
+        }
+    }
+
+    private var setupDescription: String {
+        switch setup?.kind {
+        case .deep:
+            "SpaceLens will inspect this folder deeply. Exclude anything you want it to leave unread."
+        case .folder, nil:
+            "Choose any subfolders SpaceLens should leave unread."
         }
     }
 }

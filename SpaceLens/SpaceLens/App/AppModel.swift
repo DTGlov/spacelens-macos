@@ -4,9 +4,29 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    enum ScanKind: Equatable {
+        case folder
+        case deep
+
+        var setupTitle: String {
+            switch self {
+            case .folder: "Set up this scan"
+            case .deep: "Set up Deep Scan"
+            }
+        }
+
+        var startButtonTitle: String {
+            switch self {
+            case .folder: "Scan folder"
+            case .deep: "Start Deep Scan"
+            }
+        }
+    }
+
     struct ScanSetup: Identifiable, Equatable {
         let id = UUID()
         let rootURL: URL
+        let kind: ScanKind
         var excludedURLs: Set<URL>
     }
 
@@ -134,7 +154,9 @@ final class AppModel {
     var minimumSizeFilter: MinimumSizeFilter = .any
     var insightFilter: InsightFilter = .all
     var isDuplicateFinderPresented = false
+    var isDeepScanFindingsPresented = false
     private(set) var duplicateScanState: DuplicateScanState = .idle
+    private(set) var deepScanFindings: ScanFindings = .empty
     @ObservationIgnored
     var sortOrder: [KeyPathComparator<ScanItem>]
 
@@ -146,6 +168,7 @@ final class AppModel {
     private var scanID = UUID()
     private var backStack: [URL] = []
     private var cachedResults: [URL: ScanResult] = [:]
+    private var currentScanKind: ScanKind = .folder
 
     init(
         scanner: DirectoryScanner = DirectoryScanner(),
@@ -200,6 +223,10 @@ final class AppModel {
         volumeCapacity?.folderShare(for: progress.discoveredSize)
     }
 
+    var showsDeepScanDashboard: Bool {
+        currentScanKind == .deep && rootURL == authorizedScope?.rootURL
+    }
+
     func clearFilters() {
         searchText = ""
         itemFilter = .all
@@ -247,6 +274,26 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         scanSetup = ScanSetup(
             rootURL: url.standardizedFileURL.resolvingSymlinksInPath(),
+            kind: .folder,
+            excludedURLs: []
+        )
+    }
+
+    func chooseHomeForDeepScan() {
+        let homeURL = FileManager.default.homeDirectoryForCurrentUser
+        let panel = NSOpenPanel()
+        panel.title = "Authorize a Deep Scan"
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose your Home folder, or another broad folder, to find what is using the most space. SpaceLens reads only the folder you authorize."
+        panel.directoryURL = homeURL
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        scanSetup = ScanSetup(
+            rootURL: url.standardizedFileURL.resolvingSymlinksInPath(),
+            kind: .deep,
             excludedURLs: []
         )
     }
@@ -289,22 +336,36 @@ final class AppModel {
 
     func editScanSetup() {
         guard let authorizedScope else { return }
-        scanSetup = ScanSetup(rootURL: authorizedScope.rootURL, excludedURLs: excludedURLs)
+        scanSetup = ScanSetup(
+            rootURL: authorizedScope.rootURL,
+            kind: currentScanKind,
+            excludedURLs: excludedURLs
+        )
     }
 
     func startConfiguredScan() {
         guard let scanSetup else { return }
         self.scanSetup = nil
-        beginSession(at: scanSetup.rootURL, excluding: scanSetup.excludedURLs)
+        beginSession(
+            at: scanSetup.rootURL,
+            excluding: scanSetup.excludedURLs,
+            kind: scanSetup.kind
+        )
     }
 
     func cancelScanSetup() {
         scanSetup = nil
     }
 
-    func beginSession(at url: URL, excluding excludedURLs: Set<URL> = []) {
+    func beginSession(
+        at url: URL,
+        excluding excludedURLs: Set<URL> = [],
+        kind: ScanKind = .folder
+    ) {
         cancelDuplicateScan()
         isDuplicateFinderPresented = false
+        currentScanKind = kind
+        deepScanFindings = .empty
         authorizedScope = AuthorizedScanScope(rootURL: url)
         volumeCapacity = authorizedScope.flatMap { VolumeCapacity.load(containing: $0.rootURL) }
         self.excludedURLs = normalizedExclusions(
@@ -374,6 +435,10 @@ final class AppModel {
                         self?.progress = update
                     case .finished(let result):
                         self?.cachedResults[canonicalURL] = result
+                        if self?.currentScanKind == .deep,
+                           canonicalURL == self?.authorizedScope?.rootURL {
+                            self?.deepScanFindings = result.findings
+                        }
                         self?.apply(result)
                     }
                 }
@@ -405,6 +470,10 @@ final class AppModel {
     func revealSelectedItem() {
         guard let selectedItem else { return }
         NSWorkspace.shared.activateFileViewerSelecting([selectedItem.url])
+    }
+
+    func revealDeepScanFile(_ item: ScanItem) {
+        NSWorkspace.shared.activateFileViewerSelecting([item.url])
     }
 
     func previewSelectedItem() {

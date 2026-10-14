@@ -7,7 +7,10 @@ struct ContentView: View {
         Group {
             switch model.phase {
             case .welcome:
-                WelcomeView(chooseFolder: model.chooseFolder)
+                WelcomeView(
+                    deepScan: model.chooseHomeForDeepScan,
+                    chooseFolder: model.chooseFolder
+                )
             case .scanning:
                 ScanView(model: model)
             case .results:
@@ -44,6 +47,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.isDuplicateFinderPresented, onDismiss: model.cancelDuplicateScan) {
             DuplicateFinderView(model: model)
+        }
+        .sheet(isPresented: $model.isDeepScanFindingsPresented) {
+            DeepScanFindingsView(model: model)
         }
         .sheet(item: $model.scanSetup) { _ in
             ScanSetupView(model: model)
