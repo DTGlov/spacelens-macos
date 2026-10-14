@@ -12,6 +12,9 @@ struct ResultsView: View {
                 navigationBar
                 Divider()
                 summary(displayedItemCount: displayedItems.count)
+                if model.showsDeepScanDashboard {
+                    deepScanDashboard
+                }
                 insights
                 if !model.excludedURLs.isEmpty {
                     exclusions
@@ -205,6 +208,77 @@ struct ResultsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    private var deepScanDashboard: some View {
+        let findings = model.deepScanFindings
+        let biggestFile = findings.largestFiles.first
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Deep Scan findings", systemImage: "sparkles.rectangle.stack")
+                    .font(.headline)
+                Spacer()
+                Button("Review largest files", systemImage: "arrow.up.right.square") {
+                    model.isDeepScanFindingsPresented = true
+                }
+                .controlSize(.small)
+                .disabled(findings.largestFiles.isEmpty)
+            }
+
+            HStack(spacing: 8) {
+                DeepScanFindingCard(
+                    title: "Biggest file",
+                    value: biggestFile?.allocatedSize.formatted(.byteCount(style: .file)) ?? "None found",
+                    detail: biggestFile?.name ?? "No readable files",
+                    systemImage: "doc.badge.magnifyingglass",
+                    color: .blue
+                )
+                DeepScanFindingCard(
+                    title: "Large files",
+                    value: findings.largeFileAllocatedSize.formatted(.byteCount(style: .file)),
+                    detail: "\(findings.largeFileCount.formatted()) files over 1 GB",
+                    systemImage: "externaldrive.fill.badge.plus",
+                    color: .indigo
+                )
+                DeepScanFindingCard(
+                    title: "Old large files",
+                    value: findings.oldLargeFileAllocatedSize.formatted(.byteCount(style: .file)),
+                    detail: "\(findings.oldLargeFileCount.formatted()) not modified in 1 year",
+                    systemImage: "clock.badge.exclamationmark",
+                    color: .orange
+                )
+                Button(action: model.presentDuplicateFinder) {
+                    DeepScanFindingCard(
+                        title: "Duplicates",
+                        value: "Find exact copies",
+                        detail: "Compare contents safely",
+                        systemImage: "doc.on.doc",
+                        color: .purple
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the duplicate finder")
+            }
+
+            if model.progress.skippedItemCount > 0 {
+                Label(
+                    "\(model.progress.skippedItemCount.formatted()) items could not be inspected. Results cover everything macOS allowed SpaceLens to read.",
+                    systemImage: "exclamationmark.shield"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            LinearGradient(
+                colors: [Color.blue.opacity(0.07), Color.purple.opacity(0.04)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+    }
+
     private var exclusions: some View {
         HStack(spacing: 8) {
             Label("Excluded", systemImage: "folder.badge.minus")
@@ -227,6 +301,111 @@ struct ResultsView: View {
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 10)
+    }
+}
+
+private struct DeepScanFindingCard: View {
+    let title: String
+    let value: String
+    let detail: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color)
+            Text(value)
+                .font(.system(.headline, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .padding(11)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.primary.opacity(0.07))
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct DeepScanFindingsView: View {
+    @Bindable var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Largest files found")
+                        .font(.title2.weight(.semibold))
+                    Text("The largest readable files anywhere in this Deep Scan, sorted by space used.")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Done", action: dismiss.callAsFunction)
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(20)
+
+            Divider()
+
+            if model.deepScanFindings.largestFiles.isEmpty {
+                ContentUnavailableView(
+                    "No files found",
+                    systemImage: "doc",
+                    description: Text("The authorized folder did not contain any readable files.")
+                )
+            } else {
+                Table(model.deepScanFindings.largestFiles) {
+                    TableColumn("Name") { item in
+                        Label(
+                            item.name,
+                            systemImage: ItemClassification.classify(item).category.systemImage
+                        )
+                        .lineLimit(1)
+                        .help(item.url.path)
+                    }
+                    TableColumn("Size") { item in
+                        Text(item.allocatedSize, format: .byteCount(style: .file))
+                            .monospacedDigit()
+                    }
+                    .width(min: 100, ideal: 120)
+                    TableColumn("Modified") { item in
+                        ModificationDateText(date: item.modificationDate)
+                    }
+                    .width(min: 105, ideal: 125)
+                    TableColumn("") { item in
+                        HStack(spacing: 6) {
+                            if FilePreview.isAvailable(for: item) {
+                                Button("Preview", systemImage: "eye") {
+                                    model.previewURL = item.url
+                                }
+                                .labelStyle(.iconOnly)
+                                .help("Preview \(item.name)")
+                            }
+                            Button("Show in Finder", systemImage: "folder") {
+                                model.revealDeepScanFile(item)
+                            }
+                            .labelStyle(.iconOnly)
+                            .help("Show in Finder")
+                        }
+                    }
+                    .width(70)
+                }
+            }
+        }
+        .frame(minWidth: 760, idealWidth: 900, minHeight: 520, idealHeight: 640)
+        .quickLookPreview($model.previewURL)
     }
 }
 

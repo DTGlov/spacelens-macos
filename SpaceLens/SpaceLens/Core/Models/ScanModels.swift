@@ -31,6 +31,23 @@ struct ScanProgress: Equatable, Sendable {
 struct ScanResult: Sendable {
     let items: [ScanItem]
     let progress: ScanProgress
+    let findings: ScanFindings
+}
+
+struct ScanFindings: Equatable, Sendable {
+    let largestFiles: [ScanItem]
+    let largeFileCount: Int
+    let largeFileAllocatedSize: Int64
+    let oldLargeFileCount: Int
+    let oldLargeFileAllocatedSize: Int64
+
+    static let empty = ScanFindings(
+        largestFiles: [],
+        largeFileCount: 0,
+        largeFileAllocatedSize: 0,
+        oldLargeFileCount: 0,
+        oldLargeFileAllocatedSize: 0
+    )
 }
 
 enum ScanEvent: Sendable {

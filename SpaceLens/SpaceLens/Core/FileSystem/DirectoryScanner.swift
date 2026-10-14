@@ -1,12 +1,65 @@
 import Foundation
 
 actor DirectoryScanner {
+    private struct FindingsAccumulator {
+        private(set) var largestFiles: [ScanItem] = []
+        private(set) var largeFileCount = 0
+        private(set) var largeFileAllocatedSize: Int64 = 0
+        private(set) var oldLargeFileCount = 0
+        private(set) var oldLargeFileAllocatedSize: Int64 = 0
+        let oldestIncludedDate: Date
+        let largeFileThreshold: Int64
+        let limit: Int
+
+        mutating func record(_ item: ScanItem) {
+            guard item.kind == .file, item.allocatedSize > 0 else { return }
+
+            if item.allocatedSize >= largeFileThreshold {
+                largeFileCount += 1
+                largeFileAllocatedSize += item.allocatedSize
+                if let modificationDate = item.modificationDate,
+                   modificationDate <= oldestIncludedDate {
+                    oldLargeFileCount += 1
+                    oldLargeFileAllocatedSize += item.allocatedSize
+                }
+            }
+
+            let insertionIndex = largestFiles.firstIndex {
+                $0.allocatedSize < item.allocatedSize
+            } ?? largestFiles.endIndex
+            guard insertionIndex < limit else { return }
+            largestFiles.insert(item, at: insertionIndex)
+            if largestFiles.count > limit {
+                largestFiles.removeLast()
+            }
+        }
+
+        var findings: ScanFindings {
+            ScanFindings(
+                largestFiles: largestFiles,
+                largeFileCount: largeFileCount,
+                largeFileAllocatedSize: largeFileAllocatedSize,
+                oldLargeFileCount: oldLargeFileCount,
+                oldLargeFileAllocatedSize: oldLargeFileAllocatedSize
+            )
+        }
+    }
+
     private let fileManager: FileManager
     private let progressInterval: Int
+    private let largeFileThreshold: Int64
+    private let findingsLimit: Int
 
-    init(fileManager: FileManager = .default, progressInterval: Int = 250) {
+    init(
+        fileManager: FileManager = .default,
+        progressInterval: Int = 250,
+        largeFileThreshold: Int64 = 1_000_000_000,
+        findingsLimit: Int = 200
+    ) {
         self.fileManager = fileManager
         self.progressInterval = max(progressInterval, 1)
+        self.largeFileThreshold = max(largeFileThreshold, 1)
+        self.findingsLimit = max(findingsLimit, 1)
     }
 
     nonisolated func scan(
@@ -62,6 +115,12 @@ actor DirectoryScanner {
 
         var progress = ScanProgress()
         var results: [ScanItem] = []
+        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .distantPast
+        var findings = FindingsAccumulator(
+            oldestIncludedDate: oneYearAgo,
+            largeFileThreshold: largeFileThreshold,
+            limit: findingsLimit
+        )
 
         for child in children {
             try Task.checkCancellation()
@@ -71,13 +130,14 @@ actor DirectoryScanner {
                 keys: childKeys,
                 excludedURLs: excludedURLs,
                 progress: &progress,
+                findings: &findings,
                 progressHandler: progressHandler
             ) else { continue }
             results.append(accumulator.item)
         }
 
         progressHandler(progress)
-        return ScanResult(items: results, progress: progress)
+        return ScanResult(items: results, progress: progress, findings: findings.findings)
     }
 
     private func scanTree(
@@ -86,6 +146,7 @@ actor DirectoryScanner {
         keys: Set<URLResourceKey>,
         excludedURLs: Set<URL>,
         progress: inout ScanProgress,
+        findings: inout FindingsAccumulator,
         progressHandler: @Sendable (ScanProgress) -> Void
     ) throws -> (item: ScanItem, logicalSize: Int64, allocatedSize: Int64)? {
         try Task.checkCancellation()
@@ -146,6 +207,7 @@ actor DirectoryScanner {
                         keys: keys,
                         excludedURLs: excludedURLs,
                         progress: &progress,
+                        findings: &findings,
                         progressHandler: progressHandler
                     ) else { continue }
                     logicalSize += childResult.logicalSize
@@ -190,6 +252,7 @@ actor DirectoryScanner {
             modificationDate: values.contentModificationDate,
             skippedItemCount: 0
         )
+        findings.record(item)
         return (item, logicalSize, allocatedSize)
     }
 

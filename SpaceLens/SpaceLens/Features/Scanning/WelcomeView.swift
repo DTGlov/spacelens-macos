@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    let deepScan: () -> Void
     let chooseFolder: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
@@ -78,13 +79,21 @@ struct WelcomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button(action: chooseFolder) {
-                Label("Choose a folder to scan", systemImage: "folder.badge.plus")
-                    .frame(minWidth: 190)
+            VStack(spacing: 10) {
+                WelcomeScanButton(
+                    title: "Deep Scan Home",
+                    description: "See which areas of your Mac are using the most space.",
+                    systemImage: "externaldrive.badge.magnifyingglass",
+                    action: deepScan
+                )
+
+                WelcomeScanButton(
+                    title: "Scan a Folder",
+                    description: "Inspect one specific folder, drive, or project.",
+                    systemImage: "folder.badge.plus",
+                    action: chooseFolder
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
 
             Label("Scans stay on your Mac. Nothing moves unless you confirm it.", systemImage: "lock.shield")
                 .font(.callout)
@@ -111,6 +120,68 @@ struct WelcomeView: View {
                 description: "SpaceLens never cleans automatically and only moves confirmed items to Trash."
             )
         }
+    }
+}
+
+private struct WelcomeScanButton: View {
+    let title: String
+    let description: String
+    let systemImage: String
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(WelcomeScanButtonStyle(isHovering: isHovering))
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) {
+                isHovering = hovering
+            }
+        }
+    }
+}
+
+private struct WelcomeScanButtonStyle: ButtonStyle {
+    let isHovering: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(Color.primary)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .background(
+                Color.accentColor.opacity(isHovering ? 0.09 : 0),
+                in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(
+                        isHovering ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.10)
+                    )
+            }
+            .shadow(color: .black.opacity(isHovering ? 0.09 : 0.04), radius: isHovering ? 10 : 5, y: 3)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
     }
 }
 

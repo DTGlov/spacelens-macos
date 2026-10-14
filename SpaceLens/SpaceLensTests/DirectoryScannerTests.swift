@@ -79,6 +79,33 @@ struct DirectoryScannerTests {
         #expect(result.progress.excludedFolderCount == 1)
     }
 
+    @Test
+    func collectsBoundedDeepScanFindingsAcrossNestedFolders() async throws {
+        let fixture = try TemporaryDirectory()
+        let nestedFolder = fixture.url.appending(path: "Nested", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: nestedFolder, withIntermediateDirectories: true)
+        let oldFile = nestedFolder.appending(path: "old-large.bin")
+        try Data(repeating: 1, count: 16_000).write(to: oldFile)
+        try Data(repeating: 2, count: 8_000).write(to: fixture.url.appending(path: "new-large.bin"))
+        try Data(repeating: 3, count: 20).write(to: fixture.url.appending(path: "small.bin"))
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -400 * 24 * 60 * 60)],
+            ofItemAtPath: oldFile.path
+        )
+
+        let scanner = DirectoryScanner(
+            progressInterval: 1,
+            largeFileThreshold: 5_000,
+            findingsLimit: 2
+        )
+        let result = try await completedResult(from: scanner, url: fixture.url)
+
+        #expect(result.findings.largestFiles.map(\.name) == ["old-large.bin", "new-large.bin"])
+        #expect(result.findings.largeFileCount == 2)
+        #expect(result.findings.oldLargeFileCount == 1)
+        #expect(result.findings.oldLargeFileAllocatedSize > 0)
+    }
+
     private func completedResult(
         from scanner: DirectoryScanner,
         url: URL,
