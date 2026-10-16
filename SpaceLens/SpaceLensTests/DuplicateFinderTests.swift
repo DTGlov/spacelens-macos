@@ -75,6 +75,7 @@ struct DuplicateFinderTests {
         )
         let task = Task<Bool, Error> {
             for try await event in stream {
+                guard !Task.isCancelled else { return false }
                 if case .finished = event { return true }
             }
             return false
