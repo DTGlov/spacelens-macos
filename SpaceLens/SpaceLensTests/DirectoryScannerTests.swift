@@ -47,6 +47,7 @@ struct DirectoryScannerTests {
         let stream = DirectoryScanner(progressInterval: 1).scan(url: fixture.url)
         let task = Task<Bool, Error> {
             for try await event in stream {
+                guard !Task.isCancelled else { return false }
                 if case .finished = event {
                     return true
                 }
